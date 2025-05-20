@@ -1,0 +1,17 @@
+{
+  "Elon Musk": ["E. Musk", "Elon R. Musk"],
+  "Tesla Inc.": ["Tesla", "Tesla Motors", "Tesla Corporation"],
+  "OpenAI": ["Open AI", "OpenAI Inc.", "OpenAI Corp"],
+  "Sam Altman": ["Samuel Altman", "S. Altman"],
+  "Google": ["Google LLC", "Google Inc.", "Alphabet Inc."],
+  "Microsoft": ["Microsoft Corporation", "MSFT"],
+  "Apple Inc.": ["Apple", "Apple Computer", "Apple Computer Inc."],
+  "Meta Platforms": ["Facebook", "Meta", "FB"],
+  "Amazon": ["Amazon.com", "Amazon.com Inc.", "Amazon Inc."],
+  "SpaceX": ["Space X", "Space Exploration Technologies Corp."],
+  "United States": ["USA", "U.S.A.", "U.S.", "America"],
+  "New York City": ["NYC", "New York", "NY City"],
+  "San Francisco": ["SF", "San Fran", "Frisco"],
+  "Bitcoin": ["BTC"],
+  "Ethereum": ["ETH"]
+}

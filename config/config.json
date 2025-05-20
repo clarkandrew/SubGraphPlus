@@ -1,0 +1,10 @@
+{
+  "MODEL_BACKEND": "openai",
+  "FAISS_INDEX_PATH": "data/faiss_index.bin",
+  "TOKEN_BUDGET": 4000,
+  "MLP_MODEL_PATH": "models/mlp_pretrained.pt",
+  "CACHE_DIR": "cache/",
+  "MAX_DDE_HOPS": 2,
+  "LOG_LEVEL": "INFO",
+  "API_RATE_LIMIT": 60
+}
