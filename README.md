@@ -29,6 +29,11 @@ SubgraphRAG+ is a knowledge graph-powered QA system that combines structured gra
 git clone https://github.com/yourusername/SubgraphRAGPlus.git
 cd SubgraphRAGPlus
 
+# Using the setup script (recommended)
+./setup.sh
+
+# OR manually set up components:
+
 # Install dependencies
 make setup-dev
 
@@ -152,6 +157,11 @@ For detailed API documentation, start the server and visit `http://localhost:800
 We've added convenient shell scripts to simplify common operations:
 
 ```bash
+# Setup environment
+./setup.sh                      # Complete environment setup
+./setup.sh --skip-neo4j         # Setup without Neo4j
+./setup.sh --skip-models        # Setup without downloading models
+
 # Run the application
 ./run.sh
 
@@ -222,6 +232,7 @@ The system includes a comprehensive backup and restore solution:
 - Metadata tracking for all backups with timestamps and component status
 - Selective restoration of specific backups
 - Docker-aware operation for containerized deployments
+- Graceful handling of missing components (works even if Docker or Neo4j is unavailable)
 
 ### Advanced Evaluation
 

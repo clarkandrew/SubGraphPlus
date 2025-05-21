@@ -63,40 +63,28 @@ class BackupManager:
 
             # Check if Docker is running
             if shutil.which("docker"):
-                logger.info("Backing up Neo4j via Docker...")
-                cmd = [
-                    "docker", "exec", NEO4J_CONTAINER,
-                    "bash", "-c", f"{NEO4J_BACKUP_CMD} --database=neo4j --to=/data/{backup_id}.dump"
-                ]
-                result = subprocess.run(
-                    cmd,
-                    capture_output=True,
-                    text=True,
-                    check=True
-                )
-                
-                # Copy the dump file from the container
-                copy_cmd = [
-                    "docker", "cp",
-                    f"{NEO4J_CONTAINER}:/data/{backup_id}.dump",
-                    output_file
-                ]
-                subprocess.run(copy_cmd, check=True)
-                
-                # Clean up the dump file in the container
-                cleanup_cmd = [
-                    "docker", "exec", NEO4J_CONTAINER,
-                    "rm", f"/data/{backup_id}.dump"
-                ]
-                subprocess.run(cleanup_cmd)
-            else:
-                logger.warning("Docker not found. Using direct neo4j-admin backup...")
-                if shutil.which("neo4j-admin"):
-                    # Direct backup if neo4j-admin is available
+                try:
+                    # Check if Neo4j container is running
+                    check_container_cmd = [
+                        "docker", "ps", "--format", "{{.Names}}",
+                        "--filter", f"name={NEO4J_CONTAINER}"
+                    ]
+                    container_result = subprocess.run(
+                        check_container_cmd,
+                        capture_output=True,
+                        text=True,
+                        check=False
+                    )
+                    
+                    if NEO4J_CONTAINER not in container_result.stdout:
+                        logger.warning(f"Neo4j container '{NEO4J_CONTAINER}' not found or not running.")
+                        logger.info("Skipping Neo4j backup via Docker.")
+                        return None
+                        
+                    logger.info("Backing up Neo4j via Docker...")
                     cmd = [
-                        "neo4j-admin", "dump",
-                        "--database=neo4j",
-                        f"--to={output_file}"
+                        "docker", "exec", NEO4J_CONTAINER,
+                        "bash", "-c", f"{NEO4J_BACKUP_CMD} --database=neo4j --to=/data/{backup_id}.dump"
                     ]
                     result = subprocess.run(
                         cmd,
@@ -104,16 +92,57 @@ class BackupManager:
                         text=True,
                         check=True
                     )
+                    
+                    # Copy the dump file from the container
+                    copy_cmd = [
+                        "docker", "cp",
+                        f"{NEO4J_CONTAINER}:/data/{backup_id}.dump",
+                        output_file
+                    ]
+                    subprocess.run(copy_cmd, check=True)
+                    
+                    # Clean up the dump file in the container
+                    cleanup_cmd = [
+                        "docker", "exec", NEO4J_CONTAINER,
+                        "rm", f"/data/{backup_id}.dump"
+                    ]
+                    subprocess.run(cleanup_cmd)
+                except subprocess.SubprocessError as e:
+                    logger.error(f"Docker Neo4j backup failed: {str(e)}")
+                    logger.warning("Falling back to direct neo4j-admin backup...")
+                    # Fall through to neo4j-admin backup
                 else:
-                    raise RuntimeError("Neither Docker nor neo4j-admin found. Cannot backup Neo4j.")
+                    logger.info(f"Neo4j backup via Docker completed: {output_file}")
+                    return output_file
+                    
+            # Try direct neo4j-admin if Docker failed or isn't available
+            logger.warning("Using direct neo4j-admin backup...")
+            if shutil.which("neo4j-admin"):
+                # Direct backup if neo4j-admin is available
+                cmd = [
+                    "neo4j-admin", "dump",
+                    "--database=neo4j",
+                    f"--to={output_file}"
+                ]
+                result = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    check=True
+                )
+                logger.info(f"Neo4j backup via neo4j-admin completed: {output_file}")
+                return output_file
+            else:
+                logger.error("Neither Docker nor neo4j-admin found. Cannot backup Neo4j.")
+                logger.warning("Skipping Neo4j backup.")
+                return None
 
-            logger.info(f"Neo4j backup completed: {output_file}")
-            return output_file
         except subprocess.SubprocessError as e:
             logger.error(f"Neo4j backup failed: {str(e)}")
             logger.error(f"Command output: {e.stdout if hasattr(e, 'stdout') else ''}")
             logger.error(f"Command error: {e.stderr if hasattr(e, 'stderr') else ''}")
-            raise RuntimeError(f"Neo4j backup failed: {str(e)}")
+            logger.warning("Skipping Neo4j backup due to errors.")
+            return None
 
     def backup_sqlite(self, backup_id):
         """Backup SQLite database"""
@@ -250,55 +279,82 @@ class BackupManager:
         """Restore Neo4j database from backup"""
         try:
             if not os.path.exists(backup_path):
-                raise FileNotFoundError(f"Neo4j backup file not found: {backup_path}")
+                logger.error(f"Neo4j backup file not found: {backup_path}")
+                return False
             
             # Check if Docker is running
             if shutil.which("docker"):
-                logger.info("Restoring Neo4j via Docker...")
-                
-                # Copy the dump file to the container
-                copy_cmd = [
-                    "docker", "cp",
-                    backup_path,
-                    f"{NEO4J_CONTAINER}:/data/restore.dump"
-                ]
-                subprocess.run(copy_cmd, check=True)
-                
-                # Stop Neo4j service
-                stop_cmd = [
-                    "docker", "exec", NEO4J_CONTAINER,
-                    "neo4j", "stop"
-                ]
-                subprocess.run(stop_cmd, check=True)
-                
-                # Restore the database
-                cmd = [
-                    "docker", "exec", NEO4J_CONTAINER,
-                    "bash", "-c", f"{NEO4J_RESTORE_CMD} --database=neo4j --from=/data/restore.dump --force"
-                ]
-                result = subprocess.run(
-                    cmd,
-                    capture_output=True,
-                    text=True,
-                    check=True
-                )
-                
-                # Start Neo4j service
-                start_cmd = [
-                    "docker", "exec", NEO4J_CONTAINER,
-                    "neo4j", "start"
-                ]
-                subprocess.run(start_cmd, check=True)
-                
-                # Clean up the dump file in the container
-                cleanup_cmd = [
-                    "docker", "exec", NEO4J_CONTAINER,
-                    "rm", "/data/restore.dump"
-                ]
-                subprocess.run(cleanup_cmd)
-            else:
-                logger.warning("Docker not found. Using direct neo4j-admin restore...")
-                if shutil.which("neo4j-admin"):
+                try:
+                    # Check if Neo4j container is running
+                    check_container_cmd = [
+                        "docker", "ps", "--format", "{{.Names}}",
+                        "--filter", f"name={NEO4J_CONTAINER}"
+                    ]
+                    container_result = subprocess.run(
+                        check_container_cmd,
+                        capture_output=True,
+                        text=True,
+                        check=False
+                    )
+                    
+                    if NEO4J_CONTAINER not in container_result.stdout:
+                        logger.warning(f"Neo4j container '{NEO4J_CONTAINER}' not found or not running.")
+                        logger.warning("Skipping Neo4j restore via Docker.")
+                    else:
+                        logger.info("Restoring Neo4j via Docker...")
+                        
+                        # Copy the dump file to the container
+                        copy_cmd = [
+                            "docker", "cp",
+                            backup_path,
+                            f"{NEO4J_CONTAINER}:/data/restore.dump"
+                        ]
+                        subprocess.run(copy_cmd, check=True)
+                        
+                        # Stop Neo4j service
+                        stop_cmd = [
+                            "docker", "exec", NEO4J_CONTAINER,
+                            "neo4j", "stop"
+                        ]
+                        subprocess.run(stop_cmd, check=True)
+                        
+                        # Restore the database
+                        cmd = [
+                            "docker", "exec", NEO4J_CONTAINER,
+                            "bash", "-c", f"{NEO4J_RESTORE_CMD} --database=neo4j --from=/data/restore.dump --force"
+                        ]
+                        result = subprocess.run(
+                            cmd,
+                            capture_output=True,
+                            text=True,
+                            check=True
+                        )
+                        
+                        # Start Neo4j service
+                        start_cmd = [
+                            "docker", "exec", NEO4J_CONTAINER,
+                            "neo4j", "start"
+                        ]
+                        subprocess.run(start_cmd, check=True)
+                        
+                        # Clean up the dump file in the container
+                        cleanup_cmd = [
+                            "docker", "exec", NEO4J_CONTAINER,
+                            "rm", "/data/restore.dump"
+                        ]
+                        subprocess.run(cleanup_cmd)
+                        
+                        logger.info("Neo4j restore via Docker completed")
+                        return True
+                except subprocess.SubprocessError as e:
+                    logger.error(f"Docker Neo4j restore failed: {str(e)}")
+                    logger.warning("Falling back to direct neo4j-admin restore...")
+                    # Fall through to neo4j-admin restore
+            
+            # Try direct neo4j-admin if Docker failed or isn't available
+            logger.warning("Using direct neo4j-admin restore...")
+            if shutil.which("neo4j-admin"):
+                try:
                     # Stop Neo4j service
                     subprocess.run(["neo4j", "stop"], check=True)
                     
@@ -318,16 +374,21 @@ class BackupManager:
                     
                     # Start Neo4j service
                     subprocess.run(["neo4j", "start"], check=True)
-                else:
-                    raise RuntimeError("Neither Docker nor neo4j-admin found. Cannot restore Neo4j.")
+                    
+                    logger.info("Neo4j restore via neo4j-admin completed")
+                    return True
+                except subprocess.SubprocessError as e:
+                    logger.error(f"Neo4j-admin restore failed: {str(e)}")
+                    logger.error(f"Command output: {e.stdout if hasattr(e, 'stdout') else ''}")
+                    logger.error(f"Command error: {e.stderr if hasattr(e, 'stderr') else ''}")
+                    return False
+            else:
+                logger.error("Neither Docker nor neo4j-admin found. Cannot restore Neo4j.")
+                return False
 
-            logger.info("Neo4j restore completed")
-            return True
-        except subprocess.SubprocessError as e:
+        except Exception as e:
             logger.error(f"Neo4j restore failed: {str(e)}")
-            logger.error(f"Command output: {e.stdout if hasattr(e, 'stdout') else ''}")
-            logger.error(f"Command error: {e.stderr if hasattr(e, 'stderr') else ''}")
-            raise RuntimeError(f"Neo4j restore failed: {str(e)}")
+            return False
 
     def restore_sqlite(self, backup_path):
         """Restore SQLite database from backup"""
@@ -456,50 +517,67 @@ class BackupManager:
         if not backup_id:
             backups = self.get_available_backups()
             if not backups:
-                raise ValueError("No backups found")
+                logger.error("No backups found")
+                return False
             backup_id = backups[0]["backup_id"]
         
         # Load backup metadata
         metadata_path = self._get_backup_metadata_path(backup_id)
         if not os.path.exists(metadata_path):
-            raise ValueError(f"Backup metadata not found: {metadata_path}")
+            logger.error(f"Backup metadata not found: {metadata_path}")
+            return False
         
-        with open(metadata_path, 'r') as f:
-            metadata = json.load(f)
+        try:
+            with open(metadata_path, 'r') as f:
+                metadata = json.load(f)
+        except Exception as e:
+            logger.error(f"Failed to load backup metadata: {str(e)}")
+            return False
         
         logger.info(f"Starting restore of backup {backup_id}...")
         
         errors = []
+        success_components = []
         
         # Restore Neo4j
         if "neo4j" in metadata["paths"] and metadata["paths"]["neo4j"]:
-            try:
-                self.restore_neo4j(metadata["paths"]["neo4j"])
-            except Exception as e:
-                errors.append(f"Neo4j: {str(e)}")
+            if self.restore_neo4j(metadata["paths"]["neo4j"]):
+                success_components.append("Neo4j")
+            else:
+                errors.append("Neo4j: Failed to restore")
         
         # Restore SQLite
         if "sqlite" in metadata["paths"] and metadata["paths"]["sqlite"]:
             try:
-                self.restore_sqlite(metadata["paths"]["sqlite"])
+                if self.restore_sqlite(metadata["paths"]["sqlite"]):
+                    success_components.append("SQLite")
+                else:
+                    errors.append("SQLite: Failed to restore")
             except Exception as e:
                 errors.append(f"SQLite: {str(e)}")
         
         # Restore FAISS
         if "faiss" in metadata["paths"] and metadata["paths"]["faiss"]:
             try:
-                self.restore_faiss(metadata["paths"]["faiss"])
+                if self.restore_faiss(metadata["paths"]["faiss"]):
+                    success_components.append("FAISS")
+                else:
+                    errors.append("FAISS: Failed to restore")
             except Exception as e:
                 errors.append(f"FAISS: {str(e)}")
         
         # Restore configs
         if "configs" in metadata["paths"] and metadata["paths"]["configs"]:
             try:
-                self.restore_configs(metadata["paths"]["configs"])
+                if self.restore_configs(metadata["paths"]["configs"]):
+                    success_components.append("Configs")
+                else:
+                    errors.append("Configs: Failed to restore")
             except Exception as e:
                 errors.append(f"Configs: {str(e)}")
         
         logger.info(f"Restore of backup {backup_id} completed with {len(errors)} errors")
+        logger.info(f"Successfully restored components: {', '.join(success_components)}")
         
         if errors:
             for error in errors:
@@ -515,8 +593,13 @@ def main():
                         help="Action to perform: backup, restore, or list")
     parser.add_argument("--backup-id", help="Backup ID for restore (default: latest)")
     parser.add_argument("--backup-dir", default=BACKUP_DIR, help="Backup directory")
+    parser.add_argument("--skip-docker-check", action="store_true", 
+                        help="Skip Docker container availability check")
     
     args = parser.parse_args()
+    
+    # Ensure backup directory exists
+    os.makedirs(args.backup_dir, exist_ok=True)
     
     manager = BackupManager(args.backup_dir)
     
@@ -529,6 +612,11 @@ def main():
             print(f"  - FAISS: {'✓' if 'faiss' in metadata['paths'] and metadata['paths']['faiss'] else '✗'}")
             print(f"  - Configs: {'✓' if 'configs' in metadata['paths'] and metadata['paths']['configs'] else '✗'}")
             
+            # Count successful components
+            successful = sum(1 for component in ['neo4j', 'sqlite', 'faiss', 'configs'] 
+                            if component in metadata['paths'] and metadata['paths'][component])
+            print(f"Successfully backed up {successful}/4 components")
+            
             if metadata.get("errors"):
                 print("Errors occurred during backup:")
                 for error in metadata["errors"]:
@@ -536,16 +624,20 @@ def main():
             
         elif args.action == "restore":
             success = manager.restore_backup(args.backup_id)
-            print(f"Restore {'successful' if success else 'failed'}")
+            if success:
+                print("✓ Restore completed successfully")
+            else:
+                print("⚠ Restore completed with some issues")
+                print("  Check the logs for more details")
             
         elif args.action == "list":
             backups = manager.get_available_backups()
             if not backups:
-                print("No backups found")
+                print("No backups found in", args.backup_dir)
             else:
                 print(f"Found {len(backups)} backups:")
                 for i, backup in enumerate(backups):
-                    status = "✓" if backup.get("success") else "✗"
+                    status = "✓" if backup.get("success") else "⚠"
                     timestamp = backup.get("timestamp", "unknown")
                     backup_id = backup.get("backup_id", "unknown")
                     
@@ -561,7 +653,7 @@ def main():
                         components.append("Configs")
                     
                     print(f"{i+1}. [{status}] {backup_id} - {timestamp}")
-                    print(f"   Components: {', '.join(components)}")
+                    print(f"   Components: {', '.join(components) if components else 'None'}")
             
     except Exception as e:
         logger.error(f"Error: {str(e)}")

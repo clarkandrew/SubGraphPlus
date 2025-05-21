@@ -221,17 +221,17 @@ class BenchmarkRunner:
                 # Get expected triple citations from ground truth
                 expected_citations = set(self.ground_truth[question_id].get("expected_triple_ids", []))
                 expected_answers = set(self.ground_truth[question_id].get("expected_answers", []))
-                
+            
                 # Calculate metrics if expected citations or answers are provided
                 if expected_citations:
                     result["precision"], result["recall"], result["f1_score"] = self.calculate_citation_metrics(
-                        set(cited_ids), expected_citations
+                        set(cited_ids) if cited_ids else set(), expected_citations
                     )
-                
+            
                 # Check for hallucinations - answers not backed by expected citations
                 if expected_answers:
                     result["answer_exactness"] = self.calculate_answer_exactness(answers, expected_answers)
-                    result["hallucinated"] = len(set(answers) - expected_answers) > 0
+                    result["hallucinated"] = len(set(answers if answers else []) - expected_answers) > 0
             
         except Exception as e:
             # Track specific error types
@@ -278,7 +278,7 @@ class BenchmarkRunner:
         # Simple match percentage for now
         # For better results, consider semantic similarity or fuzzy matching
         matches = sum(1 for answer in predicted_answers if answer in expected_answers)
-        return matches / max(len(predicted_answers), len(expected_answers))
+        return matches / max(len(predicted_answers), len(expected_answers)) if max(len(predicted_answers), len(expected_answers)) > 0 else 0.0
     
     def run_benchmark(self):
         """Run benchmark on all test questions"""
@@ -388,15 +388,23 @@ class BenchmarkRunner:
         # Calculate advanced metrics
         if precision_values:
             self.metrics["precision"] = sum(precision_values) / len(precision_values)
+        else:
+            self.metrics["precision"] = 0.0
         
         if recall_values:
             self.metrics["recall"] = sum(recall_values) / len(recall_values)
+        else:
+            self.metrics["recall"] = 0.0
         
         if f1_values:
             self.metrics["f1_score"] = sum(f1_values) / len(f1_values)
+        else:
+            self.metrics["f1_score"] = 0.0
         
         if entity_linking_accuracy_values:
             self.metrics["entity_linking_accuracy"] = sum(entity_linking_accuracy_values) / len(entity_linking_accuracy_values)
+        else:
+            self.metrics["entity_linking_accuracy"] = 0.0
         
         if adversarial_count > 0:
             self.metrics["adversarial_success_rate"] = adversarial_success / adversarial_count
@@ -452,20 +460,41 @@ def main():
     # Generate detailed HTML report if requested
     if args.detailed_report:
         try:
-            from jinja2 import Template
-            import matplotlib.pyplot as plt
-            import base64
-            from io import BytesIO
+            # Check for required packages
+            missing_packages = []
+            try:
+                from jinja2 import Template
+            except ImportError:
+                missing_packages.append("jinja2")
+                
+            try:
+                import matplotlib.pyplot as plt
+            except ImportError:
+                missing_packages.append("matplotlib")
+                
+            try:
+                import base64
+                from io import BytesIO
+            except ImportError:
+                missing_packages.append("base64/io")
+                
+            if missing_packages:
+                logger.warning(f"Cannot generate HTML report. Missing packages: {', '.join(missing_packages)}")
+                logger.warning("Install with: pip install jinja2 matplotlib")
+                sys.exit(1)
             
             # Generate charts
             def generate_chart(data, title, filename):
                 plt.figure(figsize=(10, 6))
                 
                 # Basic charts based on data type
-                if isinstance(data, list):
+                if isinstance(data, list) and data:
                     plt.plot(data)
-                elif isinstance(data, dict):
-                    plt.bar(data.keys(), data.values())
+                elif isinstance(data, dict) and data:
+                    plt.bar(list(data.keys())[:20], list(data.values())[:20])  # Limit to 20 items max
+                else:
+                    # Create empty chart with message
+                    plt.text(0.5, 0.5, "No data available", horizontalalignment='center', verticalalignment='center')
                 
                 plt.title(title)
                 plt.tight_layout()
@@ -482,11 +511,21 @@ def main():
                 return f"data:image/png;base64,{img_base64}"
             
             # Create charts
-            charts = {
-                "latency": generate_chart(benchmark.latencies, "Query Latency Distribution", "latency.png"),
-                "retrieval_count": generate_chart(benchmark.retrieved_triples_counts, "Retrieved Triples Count", "retrieval.png"),
-                "cited_count": generate_chart(benchmark.cited_triples_counts, "Cited Triples Count", "cited.png"),
-            }
+            charts = {}
+            try:
+                charts["latency"] = generate_chart(benchmark.latencies, "Query Latency Distribution", "latency.png")
+            except Exception as e:
+                logger.warning(f"Failed to generate latency chart: {str(e)}")
+                
+            try:
+                charts["retrieval_count"] = generate_chart(benchmark.retrieved_triples_counts, "Retrieved Triples Count", "retrieval.png")
+            except Exception as e:
+                logger.warning(f"Failed to generate retrieval count chart: {str(e)}")
+                
+            try:
+                charts["cited_count"] = generate_chart(benchmark.cited_triples_counts, "Cited Triples Count", "cited.png")
+            except Exception as e:
+                logger.warning(f"Failed to generate cited count chart: {str(e)}")
             
             # Load template
             template_path = os.path.join(os.path.dirname(__file__), "report_template.html")

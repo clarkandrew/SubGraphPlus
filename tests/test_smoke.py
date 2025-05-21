@@ -29,7 +29,7 @@ def mock_api_key():
 @pytest.fixture
 def mock_auth_header(mock_api_key):
     """Mock authorization header for testing"""
-    with patch('app.api.API_KEY_SECRET', mock_api_key):
+    with patch('app.config.API_KEY_SECRET', mock_api_key):
         return {"X-API-KEY": mock_api_key}
 
 class TestBasicSmoke:
@@ -71,7 +71,7 @@ class TestBasicSmoke:
         assert response.status_code == 400
         assert "EMPTY_TRIPLES" in response.text
     
-    @patch('app.api.generate_answer')
+    @patch('app.ml.llm.generate_answer')
     def test_llm_timeout(self, mock_generate_answer, mock_auth_header):
         """Test LLM timeout handling"""
         # Make LLM generation take too long
@@ -150,7 +150,7 @@ class TestEdgeCaseHandling:
         # Should handle many candidates without crashing
         assert response.status_code == 200
     
-    def test_concurrent_requests(self, mock_auth_header):
+    def test_concurrent_requests(self):
         """Test handling of concurrent requests"""
         # This is a basic concurrency test, not a full load test
         from concurrent.futures import ThreadPoolExecutor
