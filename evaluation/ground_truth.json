@@ -1,0 +1,52 @@
+{
+  "q1": {
+    "expected_entities": ["Tesla Inc.", "Elon Musk"],
+    "expected_triple_ids": ["001", "002", "003"],
+    "expected_answers": ["Elon Musk"]
+  },
+  "q2": {
+    "expected_entities": ["OpenAI", "Sam Altman"],
+    "expected_triple_ids": ["010", "011", "012"],
+    "expected_answers": ["Sam Altman"]
+  },
+  "q3": {
+    "expected_entities": ["Elon Musk", "Tesla Inc.", "SpaceX", "Twitter", "Neuralink", "The Boring Company"],
+    "expected_triple_ids": ["001", "020", "021", "022", "023"],
+    "expected_answers": ["Tesla Inc.", "SpaceX", "Twitter", "Neuralink", "The Boring Company"]
+  },
+  "q4": {
+    "expected_entities": ["Tesla Inc.", "Austin"],
+    "expected_triple_ids": ["030", "031"],
+    "expected_answers": ["Austin"]
+  },
+  "q5": {
+    "expected_entities": ["Microsoft", "Bill Gates", "Paul Allen"],
+    "expected_triple_ids": ["040", "041"],
+    "expected_answers": ["Bill Gates", "Paul Allen"]
+  },
+  "q6": {
+    "expected_entities": ["Elon Musk", "Twitter", "X"],
+    "expected_triple_ids": ["050", "051", "052"],
+    "expected_answers": ["Owner of X (formerly Twitter)"]
+  },
+  "q7": {
+    "expected_entities": ["Google", "Sundar Pichai"],
+    "expected_triple_ids": ["060", "061"],
+    "expected_answers": ["Sundar Pichai"]
+  },
+  "q8": {
+    "expected_entities": ["Apple Inc.", "iPhone", "iPad", "Mac", "Apple Watch", "AirPods"],
+    "expected_triple_ids": ["070", "071", "072", "073", "074"],
+    "expected_answers": ["iPhone", "iPad", "Mac", "Apple Watch", "AirPods"]
+  },
+  "q9": {
+    "expected_entities": ["Facebook", "Mark Zuckerberg"],
+    "expected_triple_ids": ["080", "081"],
+    "expected_answers": ["Mark Zuckerberg"]
+  },
+  "q10": {
+    "expected_entities": ["Meta Platforms", "Facebook", "Instagram", "WhatsApp", "Oculus"],
+    "expected_triple_ids": ["090", "091", "092", "093", "094"],
+    "expected_answers": ["Facebook", "Instagram", "WhatsApp", "Oculus"]
+  }
+}

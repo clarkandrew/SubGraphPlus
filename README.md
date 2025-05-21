@@ -106,11 +106,27 @@ SubgraphRAG+/
 ├── config/            # Configuration files
 ├── data/              # Data storage
 ├── docs/              # Documentation
+├── evaluation/        # Evaluation and benchmarking
+│   ├── benchmark.py           # Benchmark script
+│   ├── sample_questions.json  # Standard test questions
+│   ├── adversarial_questions.json # Robustness test questions
+│   └── ground_truth.json      # Ground truth for metrics
 ├── migrations/        # Neo4j schema migrations
 ├── models/            # ML model storage
 ├── prompts/           # Prompt templates
 ├── scripts/           # Utility scripts
-└── tests/             # Test suite
+│   ├── backup_restore.py      # Backup/restore functionality
+│   ├── download_models.py     # MLP model download
+│   └── ...
+├── tests/             # Test suite
+│   ├── test_adversarial.py    # Adversarial tests
+│   ├── test_api.py            # API tests
+│   ├── test_smoke.py          # Smoke and edge case tests
+│   └── ...
+├── run.sh             # Application runner script
+├── run_tests.sh       # Test runner script
+├── run_benchmark.sh   # Benchmark runner script
+└── backup.sh          # Backup operations script
 ```
 
 ## 📈 API Endpoints
@@ -125,9 +141,40 @@ SubgraphRAG+/
 | `/readyz` | GET | Readiness check |
 | `/metrics` | GET | Prometheus metrics |
 
+For detailed information about the API endpoints, request/response formats, and SSE events, refer to `documentation/api_reference.md`.
+
 For detailed API documentation, start the server and visit `http://localhost:8000/docs`.
 
 ## 🔧 Common Tasks
+
+### Using Shell Scripts
+
+We've added convenient shell scripts to simplify common operations:
+
+```bash
+# Run the application
+./run.sh
+
+# Run tests (with various options)
+./run_tests.sh                  # Run all tests
+./run_tests.sh -t unit          # Run only unit tests
+./run_tests.sh -t smoke         # Run smoke tests
+./run_tests.sh -t adversarial   # Run adversarial tests
+./run_tests.sh -c               # Generate coverage report
+
+# Run benchmarks
+./run_benchmark.sh              # Run standard benchmark
+./run_benchmark.sh -a           # Run adversarial benchmark
+./run_benchmark.sh -r           # Generate detailed HTML report
+./run_benchmark.sh -g evaluation/ground_truth.json  # Use ground truth
+
+# Backup and restore operations
+./backup.sh backup              # Create a new backup
+./backup.sh restore -i backup_20230101_120000  # Restore specific backup
+./backup.sh list                # List available backups
+```
+
+### Using Make Commands
 
 ```bash
 # Run tests
@@ -164,6 +211,24 @@ SubgraphRAG+ uses a pre-trained MLP model for triple scoring:
 ## 📝 License
 
 This project is licensed under the Apache License 2.0 - see the `LICENSE` file for details.
+
+## 🛠️ Operational Features
+
+### Backup and Restore
+
+The system includes a comprehensive backup and restore solution:
+
+- Full backup of Neo4j database, SQLite staging DB, FAISS indices, and configuration
+- Metadata tracking for all backups with timestamps and component status
+- Selective restoration of specific backups
+- Docker-aware operation for containerized deployments
+
+### Advanced Evaluation
+
+- Precision, recall, and F1 score metrics with ground truth support
+- Robustness evaluation with adversarial test questions
+- Detailed HTML reports with visualizations
+- Entity linking accuracy and hallucination detection
 
 ## 🌟 Acknowledgements
 
