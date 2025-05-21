@@ -1,0 +1,52 @@
+[
+  {
+    "id": "q1",
+    "question": "Who founded Tesla?",
+    "expected_entities": ["Tesla Inc.", "Elon Musk"]
+  },
+  {
+    "id": "q2",
+    "question": "Who is the CEO of OpenAI?",
+    "expected_entities": ["OpenAI", "Sam Altman"]
+  },
+  {
+    "id": "q3",
+    "question": "What companies has Elon Musk founded?",
+    "expected_entities": ["Elon Musk", "Tesla Inc.", "SpaceX"]
+  },
+  {
+    "id": "q4",
+    "question": "Where is Tesla headquartered?",
+    "expected_entities": ["Tesla Inc.", "Austin"]
+  },
+  {
+    "id": "q5",
+    "question": "Who founded Microsoft?",
+    "expected_entities": ["Microsoft", "Bill Gates"]
+  },
+  {
+    "id": "q6",
+    "question": "What is the relationship between Elon Musk and X?",
+    "expected_entities": ["Elon Musk", "Twitter", "X"]
+  },
+  {
+    "id": "q7",
+    "question": "Who is the CEO of Google?",
+    "expected_entities": ["Google", "Sundar Pichai"]
+  },
+  {
+    "id": "q8",
+    "question": "What products does Apple make?",
+    "expected_entities": ["Apple Inc.", "iPhone"]
+  },
+  {
+    "id": "q9",
+    "question": "Who founded Facebook?",
+    "expected_entities": ["Facebook", "Mark Zuckerberg"]
+  },
+  {
+    "id": "q10",
+    "question": "What companies does Meta own?",
+    "expected_entities": ["Meta Platforms", "Facebook", "Instagram", "WhatsApp"]
+  }
+]
