@@ -14,26 +14,58 @@ SubgraphRAG+ is a knowledge graph-powered QA system that combines structured gra
 
 ## 📋 Prerequisites
 
-- Python 3.11+
-- Neo4j (4.4+) with APOC plugin
-- SQLite3
-- (Optional) Local model support: MLX (Apple Silicon) or Hugging Face models
-- (Optional) OpenAI API key (for OpenAI backend)
+- Docker and Docker Compose (recommended deployment method)
+- OR for local development:
+  - Python 3.11+
+  - Neo4j (4.4+) with APOC plugin
+  - SQLite3
+  - (Optional) Local model support: MLX (Apple Silicon) or Hugging Face models
+  - (Optional) OpenAI API key (for OpenAI backend)
 
 ## 🚀 Quick Start
 
-1. **Setup Development Environment**
+### Using Docker (Recommended)
+
+1. **Start the System with Docker**
 
 ```bash
 # Clone repo (if needed)
 git clone https://github.com/yourusername/SubgraphRAGPlus.git
 cd SubgraphRAGPlus
 
-# Using the setup script (recommended)
+# Start everything with Docker Compose
+./docker-setup.sh start
+
+# Initialize with sample data (optional)
+./docker-setup.sh sample-data
+```
+
+2. **Test with a Query**
+
+```bash
+curl -X POST "http://localhost:8000/query" \
+  -H "X-API-KEY: changeme" \
+  -H "Content-Type: application/json" \
+  -d '{"question": "Who founded Tesla?", "visualize_graph": true}'
+```
+
+3. **Access interfaces**
+   - API Documentation: http://localhost:8000/docs
+   - Neo4j Browser: http://localhost:7474 (user: neo4j, password: password)
+
+### Local Development (Alternative)
+
+1. **Setup Local Development Environment**
+
+```bash
+# Clone repo (if needed)
+git clone https://github.com/yourusername/SubgraphRAGPlus.git
+cd SubgraphRAGPlus
+
+# Using the setup script
 ./setup.sh
 
-# OR manually set up components:
-
+# OR manually:
 # Install dependencies
 make setup-dev
 
@@ -63,18 +95,37 @@ python scripts/merge_faiss.py
 make serve
 ```
 
-4. **Test with a Query**
-
-```bash
-curl -X POST "http://localhost:8000/query" \
-  -H "X-API-KEY: default_key_for_dev_only" \
-  -H "Content-Type: application/json" \
-  -d '{"question": "Who founded Tesla?", "visualize_graph": true}'
-```
-
 ## 🔧 Configuration
 
-### Environment Variables
+### Docker Configuration
+
+When using Docker, configure the system through these methods:
+
+#### Docker Environment Variables
+
+Edit these in `docker-compose.yml`:
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `NEO4J_URI` | Neo4j connection URI | `bolt://subgraphrag_neo4j:7687` |
+| `NEO4J_USER` | Neo4j username | `neo4j` |
+| `NEO4J_PASSWORD` | Neo4j password | `password` |
+| `API_KEY_SECRET` | API key for authentication | `changeme` |
+| `OPENAI_API_KEY` | OpenAI API key (if using OpenAI backend) | None |
+| `MODEL_BACKEND` | Model backend to use | `openai` |
+
+#### Docker Volume Management
+
+The system uses Docker volumes to persist data:
+- `neo4j_data`: Neo4j database files
+- `app_data`: Application data including SQLite DB
+- `app_models`: ML models
+- `app_cache`: Cache data
+- `app_logs`: Application logs
+
+### Local Configuration
+
+#### Environment Variables
 
 | Variable | Description | Default |
 |----------|-------------|---------|
@@ -84,7 +135,7 @@ curl -X POST "http://localhost:8000/query" \
 | `API_KEY_SECRET` | API key for authentication | (auto-generated) |
 | `OPENAI_API_KEY` | OpenAI API key (if using OpenAI backend) | None |
 
-### Config Options (config/config.json)
+#### Config Options (config/config.json)
 
 | Option | Description | Default |
 |--------|-------------|---------|
@@ -128,10 +179,13 @@ SubgraphRAG+/
 │   ├── test_api.py            # API tests
 │   ├── test_smoke.py          # Smoke and edge case tests
 │   └── ...
-├── run.sh             # Application runner script
+├── docker-setup.sh    # Docker management script
+├── run.sh             # Local application runner script
 ├── run_tests.sh       # Test runner script
 ├── run_benchmark.sh   # Benchmark runner script
-└── backup.sh          # Backup operations script
+├── backup.sh          # Backup operations script
+├── Dockerfile         # Docker image definition
+└── docker-compose.yml # Docker services configuration
 ```
 
 ## 📈 API Endpoints
@@ -152,9 +206,33 @@ For detailed API documentation, start the server and visit `http://localhost:800
 
 ## 🔧 Common Tasks
 
-### Using Shell Scripts
+### Using Docker (Recommended)
 
-We've added convenient shell scripts to simplify common operations:
+```bash
+# Start/stop the system
+./docker-setup.sh start         # Start all services
+./docker-setup.sh stop          # Stop all services
+./docker-setup.sh restart       # Restart all services
+./docker-setup.sh status        # Show service status
+
+# Working with data
+./docker-setup.sh sample-data   # Initialize with sample data
+./docker-setup.sh backup        # Create data backup
+
+# Monitoring and debugging
+./docker-setup.sh logs          # View all service logs
+./docker-setup.sh resources     # Check container resource usage
+
+# Development tasks
+./docker-setup.sh rebuild       # Rebuild and restart services
+./docker-setup.sh api-shell     # Open shell in API container
+./docker-setup.sh neo4j-shell   # Open shell in Neo4j container
+./docker-setup.sh tests         # Run tests in container
+```
+
+### Using Local Shell Scripts
+
+If developing locally without Docker, use these scripts:
 
 ```bash
 # Setup environment
@@ -184,7 +262,7 @@ We've added convenient shell scripts to simplify common operations:
 ./backup.sh list                # List available backups
 ```
 
-### Using Make Commands
+### Using Make Commands (Local Development)
 
 ```bash
 # Run tests
@@ -207,9 +285,17 @@ make reset
 
 SubgraphRAG+ uses a pre-trained MLP model for triple scoring:
 
+### Using Docker
+
+The model will be downloaded automatically when the container starts if it's not present.
+
+### Local Development
+
 1. **Option 1**: Automatic download (requires internet)
    ```bash
    make get-pretrained-mlp
+   # or
+   python scripts/download_models.py
    ```
 
 2. **Option 2**: Manual acquisition
@@ -218,9 +304,30 @@ SubgraphRAG+ uses a pre-trained MLP model for triple scoring:
    - Download the resulting `cpt.pth` file
    - Place it at `models/mlp_pretrained.pt`
 
-## 📝 License
+## 🐳 Docker Deployment Details
 
-This project is licensed under the Apache License 2.0 - see the `LICENSE` file for details.
+### Container Architecture
+
+The system consists of two main containers:
+1. **subgraphrag_neo4j**: Neo4j graph database with APOC plugin
+2. **subgraphrag_api**: FastAPI application with all dependencies
+
+### Data Persistence
+
+All data is stored in Docker volumes for persistence between restarts:
+- `neo4j_data`: Neo4j database files
+- `app_data`: Application data including SQLite
+- `app_models`: ML models storage
+- `app_cache`: Cache storage
+- `app_logs`: Application logs
+
+### Scaling and Production Use
+
+For production:
+1. Update `API_KEY_SECRET` in docker-compose.yml
+2. Configure proper HTTPS termination (e.g., with Nginx or Traefik)
+3. Set `OPENAI_API_KEY` if using the OpenAI model backend
+4. Consider setting resource limits for containers
 
 ## 🛠️ Operational Features
 
@@ -240,6 +347,10 @@ The system includes a comprehensive backup and restore solution:
 - Robustness evaluation with adversarial test questions
 - Detailed HTML reports with visualizations
 - Entity linking accuracy and hallucination detection
+
+## 📝 License
+
+This project is licensed under the Apache License 2.0 - see the `LICENSE` file for details.
 
 ## 🌟 Acknowledgements
 
