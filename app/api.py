@@ -27,7 +27,7 @@ from app.utils import (
     link_entities_v2, extract_query_entities, triples_to_graph_data
 )
 from app.retriever import hybrid_retrieve_v2, entity_search, faiss_index
-from app.verify import validate_llm_output, format_prompt, check_answer_security
+from app.verify import validate_llm_output, format_prompt
 from app.ml.embedder import health_check as embedder_health_check
 from app.ml.llm import generate_answer, stream_tokens, health_check as llm_health_check
 
