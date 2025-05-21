@@ -1,0 +1,12 @@
+{{ system_message }}
+Based *only* on the following information, answer the question.
+Cite the ID of each triple you use in your reasoning using the format (id=XXX).
+Available Triples:
+{% for triple in triples %}
+(id={{ triple.id }}) {{ triple.head_name }} {{ triple.relation_name }} {{ triple.tail_name }}.
+{% endfor %}
+Question: {{ user_question }}
+Answer directly. If the information is not present in the triples, state "Information not available in provided context."
+Format your final answer(s) on new lines, each starting with "ans: ". Example:
+ans: Elon Musk (id=123)
+ans: SpaceX (id=456)
