@@ -53,3 +53,7 @@ htmlcov/
 models/data_files/webqsp/triple_scores/train.pth
 *.pth
 *.pkl
+.gitcopy
+x.sh
+*.db
+logs/app.log
