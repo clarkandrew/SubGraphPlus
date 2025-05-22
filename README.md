@@ -42,18 +42,18 @@ SubgraphRAG+/
 
 ## 🚀 Quick Start
 
-### One-Step Setup (Recommended)
+### One-Step Setup Using Make (Recommended)
 
 ```bash
 # Clone repo (if needed)
 git clone https://github.com/yourusername/SubgraphRAGPlus.git
 cd SubgraphRAGPlus
 
-# Run the quickstart script (handles everything automatically)
-./bin/quickstart.sh
+# Run the complete setup target (handles everything automatically)
+make setup-all
 ```
 
-This script will:
+This command will:
 - Set up your virtual environment
 - Install all dependencies
 - Start Neo4j using Docker
@@ -62,9 +62,10 @@ This script will:
 - Load sample data
 - Run the tests to verify everything works
 
-For options and advanced configuration:
+The Makefile is your central command hub for all operations in this project!
 ```bash
-./bin/quickstart.sh --help
+# Show all available commands
+make help
 ```
 
 For complete setup instructions, see our [Getting Started Guide](./docs/getting_started.md).
@@ -88,20 +89,26 @@ curl -X POST "http://localhost:8000/query" \
 
 ```bash
 # Start everything with Docker Compose
-./bin/docker-setup.sh start
+make docker-start
 
 # Initialize with sample data
-./bin/docker-setup.sh sample-data
+make ingest-sample
 ```
 
 #### Local Development Environment
 
 ```bash
-# Run quickstart in development mode, skipping Docker
-./bin/quickstart.sh --skip-docker
+# Install development dependencies
+make setup-dev
 
-# OR use the original setup script
-./bin/setup.sh
+# Start Neo4j
+make neo4j-start
+
+# Download MLP model
+make get-pretrained-mlp
+
+# Initialize database
+make migrate-schema
 ```
 
 For detailed developer setup instructions, see our [Getting Started Guide](./docs/getting_started.md) and [Development Environment Guide](./docs/dev_environment.md).
@@ -189,66 +196,42 @@ For detailed information about the API endpoints, request/response formats, and 
 
 For detailed API documentation, start the server and visit `http://localhost:8000/docs`.
 
-### Common Tasks
+### Common Tasks Using Makefile
+
+The Makefile is the primary way to interact with this project. Here are the most common commands:
 
 ```bash
-# Quick-start and setup
-./bin/quickstart.sh                 # Complete setup in one step
-./bin/quickstart.sh --skip-tests    # Setup without running tests
-./bin/quickstart.sh --prod          # Setup for production environment
+# Complete setup in one step
+make setup-all                   # Complete setup with everything
 
-# Start/stop the system
-./bin/docker-setup.sh start         # Start all services
-./bin/docker-setup.sh stop          # Stop all services
-./bin/docker-setup.sh restart       # Restart all services
-./bin/docker-setup.sh status        # Show service status
+# Core development commands
+make setup-dev                   # Install development dependencies
+make setup-prod                  # Install production dependencies
+make serve                       # Start the development server
+make serve-prod                  # Start the production server
 
-# Working with data
-./bin/docker-setup.sh sample-data   # Initialize with sample data
-./bin/docker-setup.sh backup        # Create data backup
+# Testing and quality
+make test                        # Run all tests
+make lint                        # Run code quality checks
 
-# Monitoring and debugging
-./bin/docker-setup.sh logs          # View all service logs
-./bin/docker-setup.sh resources     # Check container resource usage
+# Database management
+make neo4j-start                 # Start Neo4j database
+make neo4j-stop                  # Stop Neo4j database
+make migrate-schema              # Initialize database schema
 
-# Development tasks
-./bin/docker-setup.sh rebuild       # Rebuild and restart services
-./bin/docker-setup.sh api-shell     # Open shell in API container
-./bin/docker-setup.sh neo4j-shell   # Open shell in Neo4j container
-./bin/docker-setup.sh tests         # Run tests in container
+# Data operations
+make ingest-sample               # Load sample data
+make rebuild-faiss-index         # Rebuild the FAISS index
+
+# Docker operations
+make docker-start                # Start all Docker containers
+make docker-stop                 # Stop all Docker containers
+
+# Help
+make help                        # Show all available commands
 ```
 
-### Using Local Shell Scripts
-
-If developing locally without Docker, use these scripts:
-
-```bash
-# Setup environment
-./bin/setup.sh                      # Complete environment setup
-./bin/setup.sh --skip-neo4j         # Setup without Neo4j
-./bin/setup.sh --skip-models        # Setup without downloading models
-
-# Run the application
-./bin/run.sh
-
-# Run tests (with various options)
-./bin/run_tests.sh                  # Run all tests
-./bin/run_tests.sh -t unit          # Run only unit tests
-./bin/run_tests.sh -t smoke         # Run smoke tests
-./bin/run_tests.sh -t adversarial   # Run adversarial tests
-./bin/run_tests.sh -c               # Generate coverage report
-
-# Run benchmarks
-./bin/run_benchmark.sh              # Run standard benchmark
-./bin/run_benchmark.sh -a           # Run adversarial benchmark
-./bin/run_benchmark.sh -r           # Generate detailed HTML report
-./bin/run_benchmark.sh -g evaluation/ground_truth.json  # Use ground truth
-
-# Backup and restore operations
-./bin/backup.sh backup              # Create a new backup
-./bin/backup.sh restore -i backup_20230101_120000  # Restore specific backup
-./bin/backup.sh list                # List available backups
-```
+Simply run `make help` to see all available commands and what they do.
 
 ### Using Make Commands (Local Development)
 
@@ -267,6 +250,9 @@ make benchmark
 
 # Reset all data (use with caution)
 make reset
+
+# Complete setup in one step
+make setup-all
 ```
 
 ## 🧠 Pre-trained MLP Integration

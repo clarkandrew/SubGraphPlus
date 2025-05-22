@@ -1,8 +1,8 @@
 # 🚀 Getting Started with SubgraphRAG+
 
-This guide will help you get up and running with SubgraphRAG+ quickly. The simplest way to start is with our one-step quickstart script, but you also have other options:
+This guide will help you get up and running with SubgraphRAG+ quickly. The simplest way to start is with our one-step setup command using Make, but you also have other options:
 
-1. **One-step quickstart script** (recommended for everyone)
+1. **One-step Make setup** (recommended for everyone)
 2. **Docker environment** (alternative for production)
 3. **Manual local development environment** (alternative for advanced customization)
 
@@ -22,9 +22,9 @@ This guide will help you get up and running with SubgraphRAG+ quickly. The simpl
 - GPU support for local model inference
 - A virtual environment manager (venv, conda, etc.) - our quickstart script will create one for you if needed
 
-## One-Step Quickstart (Recommended)
+## One-Step Makefile Setup (Recommended)
 
-The quickstart script automates the entire setup process, making it easy to get started regardless of your experience level.
+The `setup-all` Make target automates the entire setup process, making it easy to get started regardless of your experience level.
 
 ### 1. Clone the Repository
 
@@ -33,10 +33,10 @@ git clone https://github.com/yourusername/SubgraphRAG+.git
 cd SubgraphRAG+
 ```
 
-### 2. Run the Quickstart Script
+### 2. Run the Complete Setup Command
 
 ```bash
-./bin/quickstart.sh
+make setup-all
 ```
 
 This single command will:
@@ -48,28 +48,25 @@ This single command will:
 - Load sample data
 - Run tests to verify everything works
 
-### 3. Customizing the Quickstart
+### 3. Understanding the Makefile
 
-The quickstart script has several options:
+The Makefile is the central command hub for this project. You can run any of these targets separately as needed:
 
 ```bash
-# Skip running tests
-./bin/quickstart.sh --skip-tests
+# Install dependencies only
+make setup-dev
 
-# Skip Docker setup (if you have Neo4j installed separately)
-./bin/quickstart.sh --skip-docker
+# Start Neo4j only
+make neo4j-start
 
-# Skip loading sample data
-./bin/quickstart.sh --skip-sample-data
+# Download models only
+make get-pretrained-mlp
 
-# Use production dependencies only
-./bin/quickstart.sh --prod
+# Run tests only
+make test
 
-# Use a specific Python version
-./bin/quickstart.sh --python python3.10
-
-# See all options
-./bin/quickstart.sh --help
+# See all available commands
+make help
 ```
 
 ### 4. Access the System
@@ -90,7 +87,9 @@ curl -X POST "http://localhost:8000/query" \
 ### 6. Stopping the System
 
 ```bash
-./bin/docker-setup.sh stop
+make neo4j-stop
+# OR if using Docker Compose
+make docker-stop
 ```
 
 ## Alternative Setup Methods
@@ -103,10 +102,10 @@ Using Docker provides consistent behavior across platforms and is ideal for prod
 
 ```bash
 # Start the system
-./bin/docker-setup.sh start
+make docker-start
 
 # Load sample data
-./bin/docker-setup.sh sample-data
+make ingest-sample
 ```
 
 ### Manual Local Development Setup
@@ -175,12 +174,15 @@ For more detailed configuration, edit `config/config.json` after initial setup.
 After setup is complete (using any method), start the server:
 
 ```bash
-# If using quickstart or manual setup
+# Start the development server
+make serve
+
+# OR for production mode
+make serve-prod
+
+# OR manually
 source venv/bin/activate
 python main.py --reload
-
-# OR use the convenience script
-./bin/run.sh
 ```
 
 ### Accessing the System
@@ -197,35 +199,31 @@ Once the server is running:
 
 ```bash
 # Complete setup in one step
-./bin/quickstart.sh
+make setup-all
 
 # Start the server
-./bin/run.sh
+make serve
 
 # Run all tests
-./bin/run_tests.sh
+make test
 
-# Create a backup
-./bin/backup.sh backup
+# Start Neo4j
+make neo4j-start
 ```
 
 ### Docker Management
 
 ```bash
-# View logs
-./bin/docker-setup.sh logs
+# Start Docker Compose stack
+make docker-start
 
-# Rebuild images after changes
-./bin/docker-setup.sh rebuild
+# Stop Docker Compose stack
+make docker-stop
 
-# Check resource usage
-./bin/docker-setup.sh resources
-
-# Access shell in API container
-./bin/docker-setup.sh api-shell
-
-# Run tests in container
-./bin/docker-setup.sh tests
+# For additional Docker operations, you can use docker/docker-compose commands directly:
+docker compose logs  # View logs
+docker stats         # Check resource usage
+docker exec -it subgraphrag_api /bin/bash  # Access shell in API container
 ```
 
 ### Development Tasks
@@ -280,16 +278,16 @@ SubgraphRAG+/
 
 If you encounter issues:
 
-1. **Try the quickstart script first**:
+1. **Try the complete setup command first**:
    ```bash
    # It automatically handles most common setup issues
-   ./bin/quickstart.sh
+   make setup-all
    ```
 
 2. Check the logs:
    ```bash
    # Docker
-   ./bin/docker-setup.sh logs
+   docker compose logs
    
    # Local
    cat logs/app.log

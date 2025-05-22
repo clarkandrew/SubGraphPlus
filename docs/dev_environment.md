@@ -4,15 +4,15 @@ This guide provides detailed instructions for setting up a comprehensive develop
 
 ## Quick Setup (Recommended)
 
-The fastest way to set up a complete development environment is to use our quickstart script:
+The fastest way to set up a complete development environment is to use our Make setup command:
 
 ```bash
 # Clone the repository
 git clone https://github.com/yourusername/SubgraphRAG+.git
 cd SubgraphRAG+
 
-# Run the quickstart script in development mode
-./bin/quickstart.sh
+# Run the complete setup command
+make setup-all
 ```
 
 This will automatically:
@@ -24,7 +24,7 @@ This will automatically:
 - Load sample data
 - Run tests to verify everything works
 
-After running this script, you'll have a fully functional development environment ready to go!
+After running this command, you'll have a fully functional development environment ready to go!
 
 For those who prefer a more manual approach or need to customize the setup process, follow the detailed steps below.
 
@@ -216,20 +216,29 @@ The API will be available at http://localhost:8000 with Swagger documentation at
 
 ## Development Workflow
 
-### Using the Quickstart Script for Development Tasks
+### Using Make for Development Tasks
 
 ```bash
 # Set up the entire development environment
-./bin/quickstart.sh
+make setup-all
 
-# Setup but skip running tests
-./bin/quickstart.sh --skip-tests
+# Install dependencies only
+make setup-dev
 
-# Setup but skip Docker (if you have Neo4j already configured)
-./bin/quickstart.sh --skip-docker
+# Start Neo4j only
+make neo4j-start
 
-# Use a specific Python version
-./bin/quickstart.sh --python python3.10
+# Download models only
+make get-pretrained-mlp
+
+# Initialize database schema
+make migrate-schema
+
+# Run tests only
+make test
+
+# See all available commands
+make help
 ```
 
 ### Running Tests
@@ -295,23 +304,24 @@ mypy app/
 For a consistent development environment, you can use Docker:
 
 ```bash
-# Build and start the development environment
-./bin/docker-setup.sh rebuild
+# Start Docker Compose stack
+make docker-start
 
-# Access the API container shell
-./bin/docker-setup.sh api-shell
+# Access the API container shell (using Docker directly)
+docker exec -it subgraphrag_api /bin/bash
 
-# Run tests in the container
-./bin/docker-setup.sh tests
+# Run tests
+make test
 ```
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **First Try the Quickstart Script**
+### First Try the Complete Setup Command
+
    - If you're having setup issues, try the automated approach:
-   - `./bin/quickstart.sh`
+   - `make setup-all`
    - This often resolves environment-related issues automatically
 
 2. **Neo4j Connection Problems**

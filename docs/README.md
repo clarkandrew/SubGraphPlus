@@ -4,7 +4,7 @@ Welcome to the SubgraphRAG+ documentation. This directory contains comprehensive
 
 ## Getting Started
 
-- ⭐ **[Quickstart](./getting_started.md#one-step-quickstart-recommended)** - Complete setup in one command: `./bin/quickstart.sh`
+- ⭐ **[One-Step Setup](./getting_started.md#one-step-makefile-setup-recommended)** - Complete setup in one command: `make setup-all`
 - [Getting Started Guide](./getting_started.md) - Detailed setup instructions for various environments
 - [Overview](./overview.md) - High-level introduction to SubgraphRAG+ and its capabilities
 - [Development Environment Setup](./dev_environment.md) - Detailed instructions for setting up a development environment
@@ -27,7 +27,8 @@ Welcome to the SubgraphRAG+ documentation. This directory contains comprehensive
 
 - [Project README](../README.md)
 - [GitHub Repository](https://github.com/yourusername/SubgraphRAG+)
-- [One-step Quickstart](./getting_started.md#one-step-quickstart-recommended) - `./bin/quickstart.sh`
+- [One-step Setup](./getting_started.md#one-step-makefile-setup-recommended) - `make setup-all`
+- [All Make Commands](../README.md#common-tasks-using-makefile) - `make help`
 
 ## Version Information
 

@@ -46,20 +46,66 @@ lint:
 .PHONY: test
 test:
 	@echo "Running tests..."
-	pytest tests/ -v
+	@mkdir -p logs
+	@touch logs/app.log
+	@if [ ! -d "venv" ]; then \
+		echo "Virtual environment not found. Creating..."; \
+		python3 -m venv venv; \
+		. venv/bin/activate && pip install -r requirements-dev.txt; \
+	fi
+	@echo "Checking if Neo4j is running..."
+	@if ! docker ps | grep -q neo4j; then \
+		echo "Neo4j is not running. Starting Neo4j..."; \
+		$(MAKE) neo4j-start; \
+		echo "Waiting for Neo4j to initialize..."; \
+		sleep 10; \
+	fi
+	@echo "Running tests now..."
+	@. venv/bin/activate && pytest tests/ -v --disable-warnings || { \
+		echo "Tests failed. Please check the error messages above."; \
+		exit 1; \
+	}
 	@echo "Tests complete!"
 
 # Run server in development mode
 .PHONY: serve
 serve:
 	@echo "Starting SubgraphRAG+ API server..."
-	$(PYTHON) main.py --reload
+	@mkdir -p logs
+	@if [ ! -d "venv" ]; then \
+		echo "Virtual environment not found. Creating..."; \
+		python3 -m venv venv; \
+		. venv/bin/activate && pip install -r requirements-dev.txt; \
+	fi
+	@echo "Checking if Neo4j is running..."
+	@if ! docker ps | grep -q neo4j; then \
+		echo "Neo4j is not running. Starting Neo4j..."; \
+		$(MAKE) neo4j-start; \
+		echo "Waiting for Neo4j to initialize..."; \
+		sleep 10; \
+	fi
+	@echo "Starting server now..."
+	@. venv/bin/activate && $(PYTHON) main.py --reload
 	
 # Run server in production mode
 .PHONY: serve-prod
 serve-prod:
 	@echo "Starting SubgraphRAG+ API server in production mode..."
-	uvicorn app.api:app --host 0.0.0.0 --port 8000 --workers 4
+	@mkdir -p logs
+	@if [ ! -d "venv" ]; then \
+		echo "Virtual environment not found. Creating..."; \
+		python3 -m venv venv; \
+		. venv/bin/activate && pip install -r requirements.txt; \
+	fi
+	@echo "Checking if Neo4j is running..."
+	@if ! docker ps | grep -q neo4j; then \
+		echo "Neo4j is not running. Starting Neo4j..."; \
+		$(MAKE) neo4j-start; \
+		echo "Waiting for Neo4j to initialize..."; \
+		sleep 10; \
+	fi
+	@echo "Starting production server now..."
+	@. venv/bin/activate && uvicorn app.api:app --host 0.0.0.0 --port 8000 --workers 4
 
 # Start Neo4j container
 .PHONY: neo4j-start
@@ -191,6 +237,30 @@ help:
 	@echo "  docker-start      : Start Docker Compose stack"
 	@echo "  docker-stop       : Stop Docker Compose stack"
 	@echo "  help              : Show this help message"
+
+# Complete setup - one command to set up everything
+.PHONY: setup-all
+setup-all:
+	@echo "Starting complete setup of SubgraphRAG+..."
+	@echo "Step 1: Installing dependencies..."
+	$(MAKE) setup-dev
+	@echo "Step 2: Starting Neo4j database..."
+	$(MAKE) neo4j-start
+	@echo "Step 3: Downloading pre-trained models..."
+	$(MAKE) get-pretrained-mlp
+	@echo "Step 4: Initializing database schema..."
+	$(MAKE) migrate-schema
+	@echo "Step 5: Loading sample data..."
+	$(MAKE) ingest-sample
+	@echo "Step 6: Running tests to verify setup..."
+	$(MAKE) test
+	@echo "================================================================="
+	@echo "✅ Setup complete! You can now run 'make serve' to start the API."
+	@echo "================================================================="
+
+# Shortcut for setup-all (to make it more discoverable)
+.PHONY: start
+start: setup-all
 
 # Default target
 .PHONY: default
