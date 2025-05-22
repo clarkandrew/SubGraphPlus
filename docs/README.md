@@ -4,7 +4,8 @@ Welcome to the SubgraphRAG+ documentation. This directory contains comprehensive
 
 ## Getting Started
 
-- [Getting Started Guide](./getting_started.md) - Quick setup instructions for both Docker and local development
+- ⭐ **[Quickstart](./getting_started.md#one-step-quickstart-recommended)** - Complete setup in one command: `./bin/quickstart.sh`
+- [Getting Started Guide](./getting_started.md) - Detailed setup instructions for various environments
 - [Overview](./overview.md) - High-level introduction to SubgraphRAG+ and its capabilities
 - [Development Environment Setup](./dev_environment.md) - Detailed instructions for setting up a development environment
 - [Troubleshooting](./troubleshooting.md) - Solutions for common issues and problems
@@ -13,6 +14,7 @@ Welcome to the SubgraphRAG+ documentation. This directory contains comprehensive
 
 - [API Reference](./api_reference.md) - Complete API documentation
 - [Deployment Guide](./deployment.md) - Instructions for deploying to production environments
+- [Common Tasks](./getting_started.md#common-tasks) - Reference for everyday operations
 
 ## Developer Resources
 
@@ -25,6 +27,7 @@ Welcome to the SubgraphRAG+ documentation. This directory contains comprehensive
 
 - [Project README](../README.md)
 - [GitHub Repository](https://github.com/yourusername/SubgraphRAG+)
+- [One-step Quickstart](./getting_started.md#one-step-quickstart-recommended) - `./bin/quickstart.sh`
 
 ## Version Information
 

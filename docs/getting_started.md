@@ -1,28 +1,30 @@
 # 🚀 Getting Started with SubgraphRAG+
 
-This guide will help you get up and running with SubgraphRAG+ quickly. You have two options for running the system:
-1. **Docker environment** (recommended for quick start and production)
-2. **Local development environment** (recommended for development and customization)
+This guide will help you get up and running with SubgraphRAG+ quickly. The simplest way to start is with our one-step quickstart script, but you also have other options:
+
+1. **One-step quickstart script** (recommended for everyone)
+2. **Docker environment** (alternative for production)
+3. **Manual local development environment** (alternative for advanced customization)
 
 ## Prerequisites
 
-### For Docker Environment
+### For All Methods
+- Git
+- Python 3.9+ (Python 3.11+ recommended)
+- 10GB of free disk space
+
+### Additional Requirements for Docker
 - Docker Engine 20.10+
 - Docker Compose v2
 - At least 4GB of RAM allocated to Docker
-- 10GB of free disk space
 
-### For Local Development
-- Python 3.11+
-- Neo4j 4.4+ with APOC plugin
-- SQLite3
-- Git
-- A virtual environment manager (venv, conda, etc.)
-- (Optional) GPU support for local model inference
+### Optional Components
+- GPU support for local model inference
+- A virtual environment manager (venv, conda, etc.) - our quickstart script will create one for you if needed
 
-## Docker Environment Setup
+## One-Step Quickstart (Recommended)
 
-Using Docker is the fastest way to get started with SubgraphRAG+ and ensures consistent behavior across platforms.
+The quickstart script automates the entire setup process, making it easy to get started regardless of your experience level.
 
 ### 1. Clone the Repository
 
@@ -31,24 +33,43 @@ git clone https://github.com/yourusername/SubgraphRAG+.git
 cd SubgraphRAG+
 ```
 
-### 2. Start the System
+### 2. Run the Quickstart Script
 
 ```bash
-./bin/docker-setup.sh start
+./bin/quickstart.sh
 ```
 
-This command will:
-- Build the Docker images if they don't exist
-- Start the Neo4j database container
-- Start the SubgraphRAG+ API container
-- Initialize the necessary volumes
+This single command will:
+- Set up a Python virtual environment
+- Install all dependencies
+- Start Neo4j using Docker
+- Download pre-trained models
+- Initialize the database schema
+- Load sample data
+- Run tests to verify everything works
 
-### 3. Load Sample Data (Optional)
+### 3. Customizing the Quickstart
 
-To try the system with pre-loaded sample data:
+The quickstart script has several options:
 
 ```bash
-./bin/docker-setup.sh sample-data
+# Skip running tests
+./bin/quickstart.sh --skip-tests
+
+# Skip Docker setup (if you have Neo4j installed separately)
+./bin/quickstart.sh --skip-docker
+
+# Skip loading sample data
+./bin/quickstart.sh --skip-sample-data
+
+# Use production dependencies only
+./bin/quickstart.sh --prod
+
+# Use a specific Python version
+./bin/quickstart.sh --python python3.10
+
+# See all options
+./bin/quickstart.sh --help
 ```
 
 ### 4. Access the System
@@ -72,18 +93,25 @@ curl -X POST "http://localhost:8000/query" \
 ./bin/docker-setup.sh stop
 ```
 
-## Local Development Environment Setup
+## Alternative Setup Methods
 
-For development, customization, or contributing to the project, setting up a local environment is recommended.
+If you prefer more control over the setup process, or if the quickstart doesn't work for your environment, you can use these alternative methods.
 
-### 1. Clone the Repository
+### Docker Environment Setup
+
+Using Docker provides consistent behavior across platforms and is ideal for production deployments.
 
 ```bash
-git clone https://github.com/yourusername/SubgraphRAG+.git
-cd SubgraphRAG+
+# Start the system
+./bin/docker-setup.sh start
+
+# Load sample data
+./bin/docker-setup.sh sample-data
 ```
 
-### 2. Create and Activate a Virtual Environment
+### Manual Local Development Setup
+
+For advanced development and customization:
 
 ```bash
 # Create a virtual environment
@@ -91,24 +119,31 @@ python -m venv venv
 
 # Activate it (Linux/MacOS)
 source venv/bin/activate
+# OR on Windows: venv\Scripts\activate
 
-# Activate it (Windows)
-# venv\Scripts\activate
-```
-
-### 3. Install Dependencies
-
-```bash
-# Install all dependencies including development tools
+# Install dependencies
 pip install -r requirements-dev.txt
 
-# OR use the setup script for a complete setup
-./bin/setup.sh
+# Start Neo4j (requires Docker)
+make neo4j-start
+
+# Apply database migrations
+python scripts/migrate_schema.py
+
+# Download models
+python scripts/download_models.py
+
+# Load sample data
+python scripts/stage_ingest.py --sample
+python scripts/ingest_worker.py --process-all
+python scripts/merge_faiss.py
 ```
 
-### 4. Configure Environment Variables
+### Configuration
 
-Create a `.env` file in the project root:
+All setup methods will create default configuration, but you can customize it:
+
+#### Environment Variables (.env file)
 
 ```
 # Neo4j Connection
@@ -131,48 +166,26 @@ EMBEDDING_MODEL=all-MiniLM-L6-v2
 LOG_LEVEL=INFO
 ```
 
-### 5. Start Neo4j (If Not Already Running)
+#### Configuration File (config/config.json)
+
+For more detailed configuration, edit `config/config.json` after initial setup.
+
+### Starting the Server
+
+After setup is complete (using any method), start the server:
 
 ```bash
-# Using Docker (recommended for development)
-make neo4j-start
-
-# OR manually install Neo4j Community Edition from https://neo4j.com/download/
-```
-
-### 6. Initialize the Database Schema
-
-```bash
-python scripts/migrate_schema.py
-```
-
-### 7. Download Pre-trained MLP Model
-
-```bash
-make get-pretrained-mlp
-# OR
-python scripts/download_models.py
-```
-
-### 8. Load Sample Data (Optional)
-
-```bash
-# Stage and ingest sample triples
-python scripts/stage_ingest.py --sample
-python scripts/ingest_worker.py --process-all
-python scripts/merge_faiss.py
-```
-
-### 9. Start the Development Server
-
-```bash
-# Start the development server with hot reload
-make serve
-# OR
+# If using quickstart or manual setup
+source venv/bin/activate
 python main.py --reload
+
+# OR use the convenience script
+./bin/run.sh
 ```
 
-### 10. Access the System
+### Accessing the System
+
+Once the server is running:
 
 - **API Documentation**: http://localhost:8000/docs
 - **Neo4j Browser**: http://localhost:7474 (user: neo4j, password: password)
@@ -180,7 +193,23 @@ python main.py --reload
 
 ## Common Tasks
 
-### Docker Environment
+### Quick Reference
+
+```bash
+# Complete setup in one step
+./bin/quickstart.sh
+
+# Start the server
+./bin/run.sh
+
+# Run all tests
+./bin/run_tests.sh
+
+# Create a backup
+./bin/backup.sh backup
+```
+
+### Docker Management
 
 ```bash
 # View logs
@@ -199,14 +228,9 @@ python main.py --reload
 ./bin/docker-setup.sh tests
 ```
 
-### Local Development Environment
+### Development Tasks
 
 ```bash
-# Run all tests
-./bin/run_tests.sh
-# OR
-pytest
-
 # Run linting checks
 make lint
 
@@ -215,9 +239,6 @@ make rebuild-faiss-index
 
 # Run benchmarks
 ./bin/run_benchmark.sh
-
-# Create a backup
-./bin/backup.sh backup
 ```
 
 ## Updating Configuration
@@ -259,7 +280,13 @@ SubgraphRAG+/
 
 If you encounter issues:
 
-1. Check the logs:
+1. **Try the quickstart script first**:
+   ```bash
+   # It automatically handles most common setup issues
+   ./bin/quickstart.sh
+   ```
+
+2. Check the logs:
    ```bash
    # Docker
    ./bin/docker-setup.sh logs
@@ -268,7 +295,7 @@ If you encounter issues:
    cat logs/app.log
    ```
 
-2. Ensure Neo4j is running:
+3. Ensure Neo4j is running:
    ```bash
    # Docker
    docker ps | grep neo4j
@@ -277,6 +304,6 @@ If you encounter issues:
    curl http://localhost:7474
    ```
 
-3. Verify that environment variables are set correctly
+4. Verify that environment variables are set correctly
 
-For more help, refer to the [Troubleshooting](./troubleshooting.md) guide or open an issue on GitHub.
+For more detailed help, refer to the [Troubleshooting](./troubleshooting.md) guide or open an issue on GitHub.

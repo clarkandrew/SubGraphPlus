@@ -2,6 +2,32 @@
 
 This guide provides detailed instructions for setting up a comprehensive development environment for SubgraphRAG+. Whether you're contributing to the project or customizing it for your own use, these steps will help you establish a proper development setup.
 
+## Quick Setup (Recommended)
+
+The fastest way to set up a complete development environment is to use our quickstart script:
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/SubgraphRAG+.git
+cd SubgraphRAG+
+
+# Run the quickstart script in development mode
+./bin/quickstart.sh
+```
+
+This will automatically:
+- Set up a Python virtual environment
+- Install all development dependencies
+- Start Neo4j using Docker
+- Download pre-trained models
+- Initialize the database schema
+- Load sample data
+- Run tests to verify everything works
+
+After running this script, you'll have a fully functional development environment ready to go!
+
+For those who prefer a more manual approach or need to customize the setup process, follow the detailed steps below.
+
 ## Prerequisites
 
 Before you begin, ensure you have the following installed:
@@ -190,10 +216,29 @@ The API will be available at http://localhost:8000 with Swagger documentation at
 
 ## Development Workflow
 
+### Using the Quickstart Script for Development Tasks
+
+```bash
+# Set up the entire development environment
+./bin/quickstart.sh
+
+# Setup but skip running tests
+./bin/quickstart.sh --skip-tests
+
+# Setup but skip Docker (if you have Neo4j already configured)
+./bin/quickstart.sh --skip-docker
+
+# Use a specific Python version
+./bin/quickstart.sh --python python3.10
+```
+
 ### Running Tests
 
 ```bash
-# Run all tests
+# Run all tests with the test script
+./bin/run_tests.sh
+
+# Or run pytest directly
 pytest
 
 # Run with coverage
@@ -264,20 +309,25 @@ For a consistent development environment, you can use Docker:
 
 ### Common Issues
 
-1. **Neo4j Connection Problems**
+1. **First Try the Quickstart Script**
+   - If you're having setup issues, try the automated approach:
+   - `./bin/quickstart.sh`
+   - This often resolves environment-related issues automatically
+
+2. **Neo4j Connection Problems**
    - Ensure Neo4j is running: `docker ps | grep neo4j`
    - Check connection string in `.env`
    - Try accessing Neo4j Browser: http://localhost:7474
 
-2. **Package Import Errors**
+3. **Package Import Errors**
    - Verify your virtual environment is activated
    - Update dependencies: `pip install -r requirements-dev.txt`
 
-3. **Model Loading Errors**
+4. **Model Loading Errors**
    - Confirm models are downloaded: `ls -la models/`
    - Check model paths in config
 
-4. **Port Conflicts**
+5. **Port Conflicts**
    - Check if ports are in use: `lsof -i :8000`
    - Change the port in your configuration
 
@@ -326,5 +376,7 @@ Results will be saved to `evaluation/results/`.
 - Review the [Architecture Documentation](./architecture.md)
 - Consult the [API Reference](./api_reference.md)
 - Explore the [Developer Guide](./developer_guide.md)
+
+For more comprehensive troubleshooting, consult our [Troubleshooting Guide](./troubleshooting.md).
 
 Happy coding!

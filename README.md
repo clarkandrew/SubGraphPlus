@@ -42,20 +42,29 @@ SubgraphRAG+/
 
 ## 🚀 Quick Start
 
-### Using Docker (Recommended)
-
-1. **Start the System with Docker**
+### One-Step Setup (Recommended)
 
 ```bash
 # Clone repo (if needed)
 git clone https://github.com/yourusername/SubgraphRAGPlus.git
 cd SubgraphRAGPlus
 
-# Start everything with Docker Compose
-./bin/docker-setup.sh start
+# Run the quickstart script (handles everything automatically)
+./bin/quickstart.sh
+```
 
-# Initialize with sample data (optional)
-./bin/docker-setup.sh sample-data
+This script will:
+- Set up your virtual environment
+- Install all dependencies
+- Start Neo4j using Docker
+- Download necessary models
+- Initialize the database
+- Load sample data
+- Run the tests to verify everything works
+
+For options and advanced configuration:
+```bash
+./bin/quickstart.sh --help
 ```
 
 For complete setup instructions, see our [Getting Started Guide](./docs/getting_started.md).
@@ -73,33 +82,29 @@ curl -X POST "http://localhost:8000/query" \
    - API Documentation: http://localhost:8000/docs
    - Neo4j Browser: http://localhost:7474 (user: neo4j, password: password)
 
-### Local Development (Alternative)
+### Alternative Setup Methods
 
-1. **Setup Local Development Environment**
+#### Docker Manual Setup
 
 ```bash
-# Clone repo (if needed)
-git clone https://github.com/yourusername/SubgraphRAGPlus.git
-cd SubgraphRAGPlus
+# Start everything with Docker Compose
+./bin/docker-setup.sh start
 
-# Using the setup script
-./bin/setup.sh
-
-# OR manually:
-# Install dependencies
-make setup-dev
-
-# Download pre-trained MLP model
-make get-pretrained-mlp
-
-# Start Neo4j (assuming Docker is installed)
-make neo4j-start
-
-# Apply schema migration
-make migrate-schema
+# Initialize with sample data
+./bin/docker-setup.sh sample-data
 ```
 
-For detailed developer setup instructions, see our [Getting Started Guide](./docs/getting_started.md).
+#### Local Development Environment
+
+```bash
+# Run quickstart in development mode, skipping Docker
+./bin/quickstart.sh --skip-docker
+
+# OR use the original setup script
+./bin/setup.sh
+```
+
+For detailed developer setup instructions, see our [Getting Started Guide](./docs/getting_started.md) and [Development Environment Guide](./docs/dev_environment.md).
 
 2. **Ingest Sample Data**
 
@@ -184,11 +189,14 @@ For detailed information about the API endpoints, request/response formats, and 
 
 For detailed API documentation, start the server and visit `http://localhost:8000/docs`.
 
-## 🔧 Common Tasks
-
-### Using Docker (Recommended)
+### Common Tasks
 
 ```bash
+# Quick-start and setup
+./bin/quickstart.sh                 # Complete setup in one step
+./bin/quickstart.sh --skip-tests    # Setup without running tests
+./bin/quickstart.sh --prod          # Setup for production environment
+
 # Start/stop the system
 ./bin/docker-setup.sh start         # Start all services
 ./bin/docker-setup.sh stop          # Stop all services
