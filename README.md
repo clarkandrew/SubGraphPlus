@@ -12,6 +12,24 @@ SubgraphRAG+ is a knowledge graph-powered QA system that combines structured gra
 - **Visualization-Ready**: D3.js compatible graph data with relevance scores
 - **Enterprise-Grade API**: OpenAPI compliant with comprehensive documentation
 
+## 📂 Directory Structure
+
+```
+SubgraphRAG+/
+├── app/               # Core application code
+├── bin/               # Shell scripts for running and managing the system
+├── config/            # Configuration files
+├── data/              # Data storage
+├── docs/              # Documentation and guides
+├── evaluation/        # Benchmarking and evaluation tools
+├── examples/          # Example scripts and usage demos
+├── migrations/        # Neo4j schema migrations
+├── models/            # ML model storage
+├── prompts/           # Prompt templates
+├── scripts/           # Utility Python scripts
+└── tests/             # Test suite
+```
+
 ## 📋 Prerequisites
 
 - Docker and Docker Compose (recommended deployment method)
@@ -34,11 +52,13 @@ git clone https://github.com/yourusername/SubgraphRAGPlus.git
 cd SubgraphRAGPlus
 
 # Start everything with Docker Compose
-./docker-setup.sh start
+./bin/docker-setup.sh start
 
 # Initialize with sample data (optional)
-./docker-setup.sh sample-data
+./bin/docker-setup.sh sample-data
 ```
+
+For complete setup instructions, see our [Getting Started Guide](./docs/getting_started.md).
 
 2. **Test with a Query**
 
@@ -63,7 +83,7 @@ git clone https://github.com/yourusername/SubgraphRAGPlus.git
 cd SubgraphRAGPlus
 
 # Using the setup script
-./setup.sh
+./bin/setup.sh
 
 # OR manually:
 # Install dependencies
@@ -78,6 +98,8 @@ make neo4j-start
 # Apply schema migration
 make migrate-schema
 ```
+
+For detailed developer setup instructions, see our [Getting Started Guide](./docs/getting_started.md).
 
 2. **Ingest Sample Data**
 
@@ -96,6 +118,8 @@ make serve
 ```
 
 ## 🔧 Configuration
+
+For complete configuration details, see our [Configuration Guide](./docs/deployment.md#configuration).
 
 ### Docker Configuration
 
@@ -144,50 +168,6 @@ The system uses Docker volumes to persist data:
 | `TOKEN_BUDGET` | Maximum tokens for context window | `4000` |
 | `MLP_MODEL_PATH` | Path to pre-trained SubgraphRAG MLP model | `models/mlp_pretrained.pt` |
 
-## 📂 Project Structure
-
-```
-SubgraphRAG+/
-├── app/               # Core application code
-│   ├── api.py         # FastAPI application and endpoints
-│   ├── config.py      # Configuration management
-│   ├── database.py    # Neo4j and SQLite connections
-│   ├── models.py      # Data models
-│   ├── retriever.py   # Hybrid retrieval logic
-│   ├── utils.py       # Utility functions
-│   ├── verify.py      # Output verification
-│   └── ml/            # Machine learning modules
-│       ├── embedder.py    # Text embedding
-│       └── llm.py         # Language model interface
-├── config/            # Configuration files
-├── data/              # Data storage
-├── docs/              # Documentation
-├── evaluation/        # Evaluation and benchmarking
-│   ├── benchmark.py           # Benchmark script
-│   ├── sample_questions.json  # Standard test questions
-│   ├── adversarial_questions.json # Robustness test questions
-│   └── ground_truth.json      # Ground truth for metrics
-├── migrations/        # Neo4j schema migrations
-├── models/            # ML model storage
-├── prompts/           # Prompt templates
-├── scripts/           # Utility scripts
-│   ├── backup_restore.py      # Backup/restore functionality
-│   ├── download_models.py     # MLP model download
-│   └── ...
-├── tests/             # Test suite
-│   ├── test_adversarial.py    # Adversarial tests
-│   ├── test_api.py            # API tests
-│   ├── test_smoke.py          # Smoke and edge case tests
-│   └── ...
-├── docker-setup.sh    # Docker management script
-├── run.sh             # Local application runner script
-├── run_tests.sh       # Test runner script
-├── run_benchmark.sh   # Benchmark runner script
-├── backup.sh          # Backup operations script
-├── Dockerfile         # Docker image definition
-└── docker-compose.yml # Docker services configuration
-```
-
 ## 📈 API Endpoints
 
 | Endpoint | Method | Description |
@@ -200,7 +180,7 @@ SubgraphRAG+/
 | `/readyz` | GET | Readiness check |
 | `/metrics` | GET | Prometheus metrics |
 
-For detailed information about the API endpoints, request/response formats, and SSE events, refer to `documentation/api_reference.md`.
+For detailed information about the API endpoints, request/response formats, and SSE events, refer to `docs/api_reference.md`.
 
 For detailed API documentation, start the server and visit `http://localhost:8000/docs`.
 
@@ -210,24 +190,24 @@ For detailed API documentation, start the server and visit `http://localhost:800
 
 ```bash
 # Start/stop the system
-./docker-setup.sh start         # Start all services
-./docker-setup.sh stop          # Stop all services
-./docker-setup.sh restart       # Restart all services
-./docker-setup.sh status        # Show service status
+./bin/docker-setup.sh start         # Start all services
+./bin/docker-setup.sh stop          # Stop all services
+./bin/docker-setup.sh restart       # Restart all services
+./bin/docker-setup.sh status        # Show service status
 
 # Working with data
-./docker-setup.sh sample-data   # Initialize with sample data
-./docker-setup.sh backup        # Create data backup
+./bin/docker-setup.sh sample-data   # Initialize with sample data
+./bin/docker-setup.sh backup        # Create data backup
 
 # Monitoring and debugging
-./docker-setup.sh logs          # View all service logs
-./docker-setup.sh resources     # Check container resource usage
+./bin/docker-setup.sh logs          # View all service logs
+./bin/docker-setup.sh resources     # Check container resource usage
 
 # Development tasks
-./docker-setup.sh rebuild       # Rebuild and restart services
-./docker-setup.sh api-shell     # Open shell in API container
-./docker-setup.sh neo4j-shell   # Open shell in Neo4j container
-./docker-setup.sh tests         # Run tests in container
+./bin/docker-setup.sh rebuild       # Rebuild and restart services
+./bin/docker-setup.sh api-shell     # Open shell in API container
+./bin/docker-setup.sh neo4j-shell   # Open shell in Neo4j container
+./bin/docker-setup.sh tests         # Run tests in container
 ```
 
 ### Using Local Shell Scripts
@@ -236,30 +216,30 @@ If developing locally without Docker, use these scripts:
 
 ```bash
 # Setup environment
-./setup.sh                      # Complete environment setup
-./setup.sh --skip-neo4j         # Setup without Neo4j
-./setup.sh --skip-models        # Setup without downloading models
+./bin/setup.sh                      # Complete environment setup
+./bin/setup.sh --skip-neo4j         # Setup without Neo4j
+./bin/setup.sh --skip-models        # Setup without downloading models
 
 # Run the application
-./run.sh
+./bin/run.sh
 
 # Run tests (with various options)
-./run_tests.sh                  # Run all tests
-./run_tests.sh -t unit          # Run only unit tests
-./run_tests.sh -t smoke         # Run smoke tests
-./run_tests.sh -t adversarial   # Run adversarial tests
-./run_tests.sh -c               # Generate coverage report
+./bin/run_tests.sh                  # Run all tests
+./bin/run_tests.sh -t unit          # Run only unit tests
+./bin/run_tests.sh -t smoke         # Run smoke tests
+./bin/run_tests.sh -t adversarial   # Run adversarial tests
+./bin/run_tests.sh -c               # Generate coverage report
 
 # Run benchmarks
-./run_benchmark.sh              # Run standard benchmark
-./run_benchmark.sh -a           # Run adversarial benchmark
-./run_benchmark.sh -r           # Generate detailed HTML report
-./run_benchmark.sh -g evaluation/ground_truth.json  # Use ground truth
+./bin/run_benchmark.sh              # Run standard benchmark
+./bin/run_benchmark.sh -a           # Run adversarial benchmark
+./bin/run_benchmark.sh -r           # Generate detailed HTML report
+./bin/run_benchmark.sh -g evaluation/ground_truth.json  # Use ground truth
 
 # Backup and restore operations
-./backup.sh backup              # Create a new backup
-./backup.sh restore -i backup_20230101_120000  # Restore specific backup
-./backup.sh list                # List available backups
+./bin/backup.sh backup              # Create a new backup
+./bin/backup.sh restore -i backup_20230101_120000  # Restore specific backup
+./bin/backup.sh list                # List available backups
 ```
 
 ### Using Make Commands (Local Development)
@@ -331,6 +311,8 @@ For production:
 
 ## 🛠️ Operational Features
 
+For more information about operational aspects, see our [Operations Guide](./docs/deployment.md#operations).
+
 ### Backup and Restore
 
 The system includes a comprehensive backup and restore solution:
@@ -351,6 +333,18 @@ The system includes a comprehensive backup and restore solution:
 ## 📝 License
 
 This project is licensed under the Apache License 2.0 - see the `LICENSE` file for details.
+
+## 📚 Documentation
+
+For complete documentation, visit the [docs](./docs) directory:
+
+- [Getting Started Guide](./docs/getting_started.md)
+- [API Reference](./docs/api_reference.md)
+- [Architecture Overview](./docs/architecture.md)
+- [Developer Guide](./docs/developer_guide.md)
+- [Deployment Guide](./docs/deployment.md)
+- [Testing Guide](./docs/testing.md)
+- [Evaluation Guide](./docs/evaluation.md)
 
 ## 🌟 Acknowledgements
 

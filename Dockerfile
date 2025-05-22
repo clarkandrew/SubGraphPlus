@@ -38,7 +38,7 @@ RUN python -c "import sqlite3, os; \
     conn.commit(); conn.close()"
 
 # Make scripts executable
-RUN chmod +x scripts/*.py *.sh || true
+RUN chmod +x scripts/*.py bin/*.sh || true
 
 # Create entrypoint script
 RUN echo '#!/bin/bash\n\
