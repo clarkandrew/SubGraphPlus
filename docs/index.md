@@ -66,6 +66,6 @@ Welcome to the SubgraphRAG+ documentation. This guide provides comprehensive inf
 
 If you can't find the information you need in this documentation:
 
-1. Open an issue on our [GitHub repository](https://github.com/yourusername/SubgraphRAG+)
+1. Open an issue on our [GitHub repository](https://github.com/clarkandrew/SubgraphRAG+)
 2. Join our community discussion on [Discord](https://discord.gg/subgraphragplus)
 3. Check our [FAQ](faq.md) for answers to common questions

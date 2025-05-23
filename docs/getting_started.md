@@ -33,7 +33,7 @@ The `setup-all` Make target automates the entire setup process, making it easy t
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/SubgraphRAG+.git
+git clone https://github.com/clarkandrew/SubgraphRAG+.git
 cd SubgraphRAG+
 ```
 
@@ -325,7 +325,7 @@ If you encounter issues:
    ```bash
    # Docker
    docker compose logs
-   
+
    # Local
    cat logs/app.log
    ```
@@ -334,7 +334,7 @@ If you encounter issues:
    ```bash
    # Docker
    docker ps | grep neo4j
-   
+
    # Local installation
    curl http://localhost:7474
    # Or check via Neo4j Desktop application

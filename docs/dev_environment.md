@@ -8,7 +8,7 @@ The fastest way to set up a complete development environment is to use our Make 
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/SubgraphRAG+.git
+git clone https://github.com/clarkandrew/SubgraphRAG+.git
 cd SubgraphRAG+
 
 # Run the complete setup command (with Docker)
@@ -46,7 +46,7 @@ Before you begin, ensure you have the following installed:
 ## Step 1: Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/SubgraphRAG+.git
+git clone https://github.com/clarkandrew/SubgraphRAG+.git
 cd SubgraphRAG+
 ```
 
@@ -385,7 +385,7 @@ make test
      - Check if Neo4j service is running:
        - Neo4j Desktop: Check the database status in the application
        - Homebrew: `brew services list | grep neo4j`
-       - Linux: `systemctl status neo4j` 
+       - Linux: `systemctl status neo4j`
    - Check connection string in `.env`
    - Try accessing Neo4j Browser: http://localhost:7474
 

@@ -36,7 +36,7 @@ SubgraphRAG+ combines several components that need to work together:
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/SubgraphRAGPlus.git
+git clone https://github.com/clarkandrew/SubgraphRAGPlus.git
 cd SubgraphRAGPlus
 
 # Make scripts executable
@@ -188,7 +188,7 @@ NEO4J_PASSWORD=your_password_here
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/SubgraphRAGPlus.git
+git clone https://github.com/clarkandrew/SubgraphRAGPlus.git
 cd SubgraphRAGPlus
 
 # Make scripts executable

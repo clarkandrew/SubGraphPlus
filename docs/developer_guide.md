@@ -11,7 +11,7 @@ Welcome to the SubgraphRAG+ developer guide! This document provides essential in
 1. **Clone the repository**
 
 ```bash
-git clone https://github.com/yourusername/SubgraphRAGPlus.git
+git clone https://github.com/clarkandrew/SubgraphRAGPlus.git
 cd SubgraphRAGPlus
 ```
 

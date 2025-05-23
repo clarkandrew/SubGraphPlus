@@ -114,3 +114,4 @@ backups/
 evaluation/results.json
 evaluation/metrics.json
 evaluation/benchmark_report.html
+.gitsmart

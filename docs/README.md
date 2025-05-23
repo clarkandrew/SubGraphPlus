@@ -26,7 +26,7 @@ Welcome to the SubgraphRAG+ documentation. This directory contains comprehensive
 ## Quick Links
 
 - [Project README](../README.md)
-- [GitHub Repository](https://github.com/yourusername/SubgraphRAG+)
+- [GitHub Repository](https://github.com/clarkandrew/SubgraphRAG+)
 - [One-step Setup](./getting_started.md#one-step-makefile-setup-recommended) - `make setup-all`
 - [All Make Commands](../README.md#common-tasks-using-makefile) - `make help`
 
