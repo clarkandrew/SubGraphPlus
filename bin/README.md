@@ -2,7 +2,7 @@
 
 This directory contains utility scripts for setting up and managing your SubgraphRAG+ environment.
 
-## Setup Scripts
+### Setup Scripts
 
 ### Development Environment
 
@@ -15,7 +15,7 @@ To set up a local development environment using Python virtualenv:
 This script:
 - Creates a Python virtual environment
 - Installs all development dependencies
-- Sets up Neo4j using Docker (if available)
+- Sets up Neo4j using Docker (if available) or connects to local Neo4j
 - Downloads pre-trained models
 - Initializes the database schema
 - Loads sample data
@@ -26,6 +26,30 @@ Options:
 - `--skip-neo4j`: Skip Neo4j setup
 - `--skip-sample-data`: Skip loading sample data
 - `--python VERSION`: Use specific Python version
+- `--use-local-neo4j`: Use locally installed Neo4j instead of Docker
+
+### Local Neo4j Installation
+
+To install Neo4j locally without Docker:
+
+```bash
+./bin/install_neo4j.sh
+```
+
+This script:
+- Installs Neo4j directly on your system (no Docker required)
+- Installs the APOC plugin
+- Configures Neo4j for remote connections
+- Sets default credentials
+- Updates .env file with connection details
+
+Options:
+- `--version VERSION`: Neo4j version to install (default: 4.4.30)
+- `--apoc-version VER`: APOC plugin version (default: 4.4.0.15)
+- `--install-dir DIR`: Installation directory (defaults to platform-specific path)
+- `--sudo`: Use sudo for installation (Linux only)
+- `--no-update-env`: Don't update .env file
+- `--no-start`: Don't start Neo4j after installation
 
 ### Docker Environment
 
@@ -68,10 +92,14 @@ Commands:
 ### Running the Application
 
 ```bash
-./bin/run.sh
+./bin/run.sh [options]
 ```
 
 Starts the application server with default settings.
+
+Options:
+- `--port PORT`: Port to run the server on (default: 8000)
+- `--no-debug`: Run without debug mode (no auto-reload)
 
 ### Running Tests
 

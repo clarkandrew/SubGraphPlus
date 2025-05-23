@@ -77,13 +77,68 @@ fi
 # Set environment variables if .env file exists
 if [ -f ".env" ]; then
   echo -e "${GREEN}Loading environment variables...${NC}"
-  export $(grep -v '^#' .env | xargs)
+  set -a # automatically export all variables
+  # shellcheck disable=SC1091
+  source .env
+  set +a
 fi
 
 # Create directories if they don't exist
 mkdir -p logs
 mkdir -p cache
 mkdir -p data/faiss
+
+# Check for Neo4j connectivity if we're running integration tests
+if [[ "$TEST_TYPE" == "all" || "$TEST_TYPE" == "integration" ]]; then
+  # Check if .env has USE_LOCAL_NEO4J flag
+  USE_LOCAL_NEO4J=false
+  if [ -f ".env" ] && grep -q "USE_LOCAL_NEO4J=true" .env; then
+    USE_LOCAL_NEO4J=true
+  fi
+  
+  if [ "$USE_LOCAL_NEO4J" = true ]; then
+    echo -e "${YELLOW}Using local Neo4j installation for tests...${NC}"
+    
+    # Check if Neo4j is running locally (basic check)
+    NEO4J_USER=${NEO4J_USER:-"neo4j"}
+    NEO4J_PASSWORD=${NEO4J_PASSWORD:-"password"}
+    NEO4J_URI=${NEO4J_URI:-"neo4j://localhost:7687"}
+    
+    # Python-based check since it will be used in tests anyway
+    if python -c "
+from neo4j import GraphDatabase
+import sys
+try:
+    with GraphDatabase.driver('$NEO4J_URI', auth=('$NEO4J_USER', '$NEO4J_PASSWORD')) as driver:
+        result = driver.session().run('RETURN 1 as n')
+        list(result)
+        print('Neo4j connection successful')
+        sys.exit(0)
+except Exception as e:
+    print(f'Neo4j connection error: {str(e)}')
+    sys.exit(1)
+" 2>/dev/null; then
+      echo -e "${GREEN}Successfully connected to local Neo4j.${NC}"
+    else
+      echo -e "${YELLOW}Warning: Could not connect to local Neo4j. Some tests may fail.${NC}"
+      echo -e "${YELLOW}Tips for starting Neo4j:${NC}"
+      echo -e "  - Neo4j Desktop: Start through the application interface"
+      echo -e "  - macOS Homebrew: brew services start neo4j"
+      echo -e "  - Linux systemd: sudo systemctl start neo4j"
+    fi
+  else
+    # Check for Docker-based Neo4j
+    if command -v docker &> /dev/null; then
+      if ! docker ps | grep -q subgraphrag_neo4j; then
+        echo -e "${YELLOW}Neo4j container not running. Some tests may fail.${NC}"
+      else
+        echo -e "${GREEN}Neo4j container is running.${NC}"
+      fi
+    else
+      echo -e "${YELLOW}Docker not found. If you're using a local Neo4j installation, add USE_LOCAL_NEO4J=true to your .env file.${NC}"
+    fi
+  fi
+fi
 
 # Run the selected tests
 if [ "$COVERAGE" = true ]; then
@@ -105,6 +160,7 @@ case $TEST_TYPE in
     $COVERAGE_CMD pytest $PYTEST_OPTS tests/test_utils.py tests/test_retriever.py
     ;;
   "integration")
+    echo -e "${YELLOW}Running integration tests. Ensure Neo4j is running.${NC}"
     $COVERAGE_CMD pytest $PYTEST_OPTS tests/test_api.py
     ;;
   "smoke")

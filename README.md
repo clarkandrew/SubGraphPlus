@@ -4,6 +4,9 @@
 
 SubgraphRAG+ is a knowledge graph-powered QA system that combines structured graph traversal with dense vector retrieval to provide accurate, contextual answers with explanatory visualizations. Built on the original SubgraphRAG research, this enhanced version adds dynamic knowledge graph ingestion, hybrid retrieval, and enterprise-grade API features.
 
+[![Documentation](https://img.shields.io/badge/docs-available-brightgreen.svg)](docs/index.md)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+
 ## 🌟 Key Features
 
 - **Hybrid Retrieval**: Combines graph traversal and semantic search for optimal recall
@@ -35,7 +38,7 @@ SubgraphRAG+/
 - Docker and Docker Compose (recommended deployment method)
 - OR for local development:
   - Python 3.11+
-  - Neo4j (4.4+) with APOC plugin
+  - Neo4j (4.4+) with APOC plugin (Docker or [local installation](docs/dev_environment.md#step-5-set-up-neo4j-for-development))
   - SQLite3
   - (Optional) Local model support: MLX (Apple Silicon) or Hugging Face models
   - (Optional) OpenAI API key (for OpenAI backend)
@@ -68,7 +71,7 @@ The Makefile is your central command hub for all operations in this project!
 make help
 ```
 
-For complete setup instructions, see our [Getting Started Guide](./docs/getting_started.md).
+For complete setup instructions, see our [Getting Started Guide](./docs/getting_started.md) or [Developer Environment Guide](./docs/dev_environment.md).
 
 2. **Test with a Query**
 
@@ -101,8 +104,10 @@ make ingest-sample
 # Install development dependencies
 make setup-dev
 
-# Start Neo4j
+# Start Neo4j (with Docker)
 make neo4j-start
+# OR install Neo4j locally
+./bin/install_neo4j.sh
 
 # Download MLP model
 make get-pretrained-mlp
@@ -332,13 +337,14 @@ This project is licensed under the Apache License 2.0 - see the `LICENSE` file f
 
 For complete documentation, visit the [docs](./docs) directory:
 
-- [Getting Started Guide](./docs/getting_started.md)
-- [API Reference](./docs/api_reference.md)
-- [Architecture Overview](./docs/architecture.md)
-- [Developer Guide](./docs/developer_guide.md)
-- [Deployment Guide](./docs/deployment.md)
-- [Testing Guide](./docs/testing.md)
-- [Evaluation Guide](./docs/evaluation.md)
+- [Documentation Index](./docs/index.md) - Full documentation index
+- [Getting Started Guide](./docs/getting_started.md) - Install and setup instructions
+- [Developer Environment Guide](./docs/dev_environment.md) - Setting up for development
+- [API Reference](./docs/api_reference.md) - API endpoint details
+- [Architecture Overview](./docs/architecture.md) - System design and components
+- [Deployment Guide](./docs/deployment.md) - Production deployment
+- [Testing Guide](./docs/testing.md) - Running and writing tests
+- [Evaluation Guide](./docs/evaluation.md) - Benchmarking and evaluation
 
 ## 🌟 Acknowledgements
 

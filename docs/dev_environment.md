@@ -11,14 +11,17 @@ The fastest way to set up a complete development environment is to use our Make 
 git clone https://github.com/yourusername/SubgraphRAG+.git
 cd SubgraphRAG+
 
-# Run the complete setup command
+# Run the complete setup command (with Docker)
 make setup-all
+
+# OR with locally installed Neo4j
+./bin/setup_dev.sh --use-local-neo4j
 ```
 
 This will automatically:
 - Set up a Python virtual environment
 - Install all development dependencies
-- Start Neo4j using Docker
+- Start Neo4j using Docker (or connect to local Neo4j if using `--use-local-neo4j` flag)
 - Download pre-trained models
 - Initialize the database schema
 - Load sample data
@@ -35,7 +38,9 @@ Before you begin, ensure you have the following installed:
 - **Python 3.11+** - The core programming language
 - **Git** - For version control
 - **pip** - For package management (comes with Python)
-- **Docker & Docker Compose** (optional) - For containerized development
+- **One of the following**:
+  - **Docker & Docker Compose** - For containerized Neo4j
+  - **Neo4j** (4.4+) - Locally installed with APOC plugin
 - **make** - For using the project's Makefile shortcuts
 
 ## Step 1: Clone the Repository
@@ -96,7 +101,7 @@ pre-commit install
 
 ## Step 5: Set Up Neo4j for Development
 
-### Option A: Using Docker (Recommended)
+### Option A: Using Docker
 
 ```bash
 # Start Neo4j with Docker
@@ -105,7 +110,34 @@ make neo4j-start
 
 This will start a Neo4j container with the APOC plugin and expose ports 7474 (HTTP) and 7687 (Bolt).
 
-### Option B: Manual Installation
+### Option B: Using Neo4j Desktop (Recommended for local development)
+
+1. Download [Neo4j Desktop](https://neo4j.com/download/)
+2. Install and run Neo4j Desktop
+3. Create a new project and add a local database (version 4.4+ recommended)
+4. Set password to "password" (or update your .env file accordingly)
+5. Start the database
+6. Install the APOC plugin via the Plugins tab in Neo4j Desktop
+
+### Option C: Using Homebrew (macOS)
+
+```bash
+# Install Neo4j
+brew install neo4j
+
+# Start the service
+brew services start neo4j
+
+# Set password (will prompt for password change)
+cypher-shell -u neo4j -p neo4j
+
+# Install APOC plugin
+wget https://github.com/neo4j-contrib/neo4j-apoc-procedures/releases/download/4.4.0.10/apoc-4.4.0.10-all.jar
+mv apoc-4.4.0.10-all.jar /usr/local/var/neo4j/plugins/
+brew services restart neo4j
+```
+
+### Option D: Manual Installation
 
 1. [Download Neo4j Community Edition](https://neo4j.com/download/)
 2. Install the APOC plugin
@@ -115,6 +147,7 @@ This will start a Neo4j container with the APOC plugin and expose ports 7474 (HT
    dbms.connector.bolt.listen_address=0.0.0.0:7687
    dbms.connector.http.enabled=true
    dbms.connector.http.listen_address=0.0.0.0:7474
+   dbms.security.procedures.unrestricted=apoc.*
    ```
 
 ## Step 6: Create Local Configuration
@@ -225,8 +258,11 @@ make setup-all
 # Install dependencies only
 make setup-dev
 
-# Start Neo4j only
+# Start Neo4j with Docker
 make neo4j-start
+
+# OR if using local Neo4j
+# Ensure your Neo4j installation is running
 
 # Download models only
 make get-pretrained-mlp
@@ -299,7 +335,9 @@ mypy app/
 
 4. Create a Pull Request on GitHub
 
-## Docker Development Environment
+## Development Environments
+
+### Docker Development Environment
 
 For a consistent development environment, you can use Docker:
 
@@ -314,18 +352,40 @@ docker exec -it subgraphrag_api /bin/bash
 make test
 ```
 
+### Local Neo4j Development Environment
+
+You can also develop using a locally installed Neo4j instance:
+
+```bash
+# Set up development environment with local Neo4j
+./bin/setup_dev.sh --use-local-neo4j
+
+# Start the development server
+python main.py --reload
+
+# Run tests
+make test
+```
+
 ## Troubleshooting
 
 ### Common Issues
 
-### First Try the Complete Setup Command
+1. **First Try the Complete Setup Command**
 
    - If you're having setup issues, try the automated approach:
-   - `make setup-all`
+   - `make setup-all` (for Docker-based setup)
+   - `./bin/setup_dev.sh --use-local-neo4j` (for local Neo4j setup)
    - This often resolves environment-related issues automatically
 
 2. **Neo4j Connection Problems**
-   - Ensure Neo4j is running: `docker ps | grep neo4j`
+   - For Docker-based Neo4j:
+     - Ensure Neo4j container is running: `docker ps | grep neo4j`
+   - For locally installed Neo4j:
+     - Check if Neo4j service is running:
+       - Neo4j Desktop: Check the database status in the application
+       - Homebrew: `brew services list | grep neo4j`
+       - Linux: `systemctl status neo4j` 
    - Check connection string in `.env`
    - Try accessing Neo4j Browser: http://localhost:7474
 

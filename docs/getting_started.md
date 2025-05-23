@@ -18,6 +18,10 @@ This guide will help you get up and running with SubgraphRAG+ quickly. The simpl
 - Docker Compose v2
 - At least 4GB of RAM allocated to Docker
 
+### Alternative Requirements (Non-Docker)
+- Neo4j (4.4+) installed locally if not using Docker
+- APOC plugin for Neo4j
+
 ### Optional Components
 - GPU support for local model inference
 - A virtual environment manager (venv, conda, etc.) - our quickstart script will create one for you if needed
@@ -56,7 +60,7 @@ The Makefile is the central command hub for this project. You can run any of the
 # Install dependencies only
 make setup-dev
 
-# Start Neo4j only
+# Start Neo4j with Docker
 make neo4j-start
 
 # Download models only
@@ -108,6 +112,34 @@ make docker-start
 make ingest-sample
 ```
 
+### Local Neo4j Setup (Without Docker)
+
+If you prefer not to use Docker, you can install Neo4j directly on your system:
+
+#### Option 1: Neo4j Desktop (Recommended for development)
+
+1. Download Neo4j Desktop from [neo4j.com/download](https://neo4j.com/download/)
+2. Install and run Neo4j Desktop
+3. Create a new project and add a local database (version 4.4+ recommended)
+4. Set password to "password" (or update your .env file accordingly)
+5. Start the database
+6. Install the APOC plugin via the Plugins tab in Neo4j Desktop
+
+#### Option 2: Install Neo4j with Homebrew (macOS)
+
+```bash
+# Install Neo4j
+brew install neo4j
+
+# Start the service
+brew services start neo4j
+
+# Set password (will prompt for password change)
+cypher-shell -u neo4j -p neo4j
+
+# Install APOC plugin (may require additional steps)
+```
+
 ### Manual Local Development Setup
 
 For advanced development and customization:
@@ -123,8 +155,13 @@ source venv/bin/activate
 # Install dependencies
 pip install -r requirements-dev.txt
 
-# Start Neo4j (requires Docker)
+# Option 1: Start Neo4j with Docker
 make neo4j-start
+
+# Option 2: If using locally installed Neo4j
+# Ensure Neo4j is running:
+# - If using Neo4j Desktop: Start from the application
+# - If using Homebrew: brew services start neo4j
 
 # Apply database migrations
 python scripts/migrate_schema.py
@@ -207,7 +244,7 @@ make serve
 # Run all tests
 make test
 
-# Start Neo4j
+# Start Neo4j (Docker)
 make neo4j-start
 ```
 
@@ -298,8 +335,9 @@ If you encounter issues:
    # Docker
    docker ps | grep neo4j
    
-   # Local
+   # Local installation
    curl http://localhost:7474
+   # Or check via Neo4j Desktop application
    ```
 
 4. Verify that environment variables are set correctly

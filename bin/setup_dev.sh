@@ -27,6 +27,7 @@ SKIP_TESTS=false
 SKIP_NEO4J=false
 SKIP_SAMPLE_DATA=false
 PYTHON_PREFERRED_VERSION=""
+USE_LOCAL_NEO4J=false
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -47,6 +48,10 @@ while [[ $# -gt 0 ]]; do
       PYTHON_PREFERRED_VERSION="$2"
       shift 2
       ;;
+    --use-local-neo4j)
+      USE_LOCAL_NEO4J=true
+      shift
+      ;;
     -h|--help)
       echo "Usage: ./bin/setup_dev.sh [options]"
       echo ""
@@ -55,6 +60,8 @@ while [[ $# -gt 0 ]]; do
       echo "  --skip-neo4j         Skip Neo4j setup (if you have it running separately)"
       echo "  --skip-sample-data   Skip loading sample data"
       echo "  --python VERSION     Use specific Python version (e.g., python3.11)"
+      echo "  --use-local-neo4j    Use locally installed Neo4j instead of Docker"
+      echo "                       (Requires Neo4j 4.4+ with APOC plugin installed)"
       echo "  -h, --help           Show this help message"
       exit 0
       ;;
@@ -145,35 +152,60 @@ setup_neo4j() {
 
   echo -e "${BLUE}Setting up Neo4j database...${NC}"
 
-  # Check if Docker is installed
-  if ! command -v docker >/dev/null 2>&1; then
-    echo -e "${RED}Docker is not installed. Please install Docker and try again.${NC}"
-    echo "Visit https://docs.docker.com/get-docker/ for installation instructions."
-    echo -e "${YELLOW}You can run this script with --skip-neo4j flag to skip this step if you have Neo4j installed separately.${NC}"
-    exit 1
-  fi
-
-  # Check if docker-compose is installed
-  if ! command -v docker-compose >/dev/null 2>&1 && ! docker compose version >/dev/null 2>&1; then
-    echo -e "${RED}Docker Compose is not installed. Please install Docker Compose and try again.${NC}"
-    echo "Visit https://docs.docker.com/compose/install/ for installation instructions."
-    exit 1
-  fi
-
-  # Check if Neo4j container is already running
-  if docker ps | grep -q "subgraphrag_neo4j"; then
-    echo -e "${YELLOW}Neo4j container is already running.${NC}"
-  else
-    echo -e "${GREEN}Starting Neo4j container...${NC}"
-    if docker compose version >/dev/null 2>&1; then
-      docker compose up -d neo4j
+  if [ "$USE_LOCAL_NEO4J" = true ]; then
+    echo -e "${BLUE}Using locally installed Neo4j...${NC}"
+    
+    # Check if Neo4j is installed locally
+    if command -v neo4j >/dev/null 2>&1 || command -v cypher-shell >/dev/null 2>&1 || [ -d "/Applications/Neo4j Desktop.app" ]; then
+      echo -e "${GREEN}Neo4j appears to be installed.${NC}"
+      echo -e "${YELLOW}Please ensure your Neo4j instance is running and accessible at neo4j://localhost:7687${NC}"
+      echo -e "${YELLOW}with username 'neo4j' and password 'password' (or update your .env file).${NC}"
+      
+      # Give user time to start Neo4j if needed
+      echo -e "${YELLOW}If Neo4j is not running, please start it now...${NC}"
+      sleep 5
     else
-      docker-compose up -d neo4j
+      echo -e "${YELLOW}Neo4j does not appear to be installed.${NC}"
+      echo -e "${YELLOW}Please install Neo4j using one of these methods:${NC}"
+      echo -e "1. Download Neo4j Desktop: https://neo4j.com/download/"
+      echo -e "2. Use Homebrew: brew install neo4j"
+      echo -e "   Then start with: brew services start neo4j"
+      echo -e "   Set password with: cypher-shell -u neo4j -p neo4j"
+      echo -e "${YELLOW}Press any key to continue once Neo4j is installed and running...${NC}"
+      read -n 1 -s
+    fi
+  else
+    # Check if Docker is installed
+    if ! command -v docker >/dev/null 2>&1; then
+      echo -e "${RED}Docker is not installed. Please install Docker and try again.${NC}"
+      echo "Visit https://docs.docker.com/get-docker/ for installation instructions."
+      echo -e "${YELLOW}You can run this script with --skip-neo4j flag to skip this step if you have Neo4j installed separately.${NC}"
+      echo -e "${YELLOW}Or use --use-local-neo4j if you have Neo4j installed locally.${NC}"
+      exit 1
     fi
 
-    # Wait for Neo4j to start
-    echo -e "${YELLOW}Waiting for Neo4j to start (this may take a minute)...${NC}"
-    sleep 10
+    # Check if docker-compose is installed
+    if ! command -v docker-compose >/dev/null 2>&1 && ! docker compose version >/dev/null 2>&1; then
+      echo -e "${RED}Docker Compose is not installed. Please install Docker Compose and try again.${NC}"
+      echo "Visit https://docs.docker.com/compose/install/ for installation instructions."
+      exit 1
+    fi
+
+    # Check if Neo4j container is already running
+    if docker ps | grep -q "subgraphrag_neo4j"; then
+      echo -e "${YELLOW}Neo4j container is already running.${NC}"
+    else
+      echo -e "${GREEN}Starting Neo4j container...${NC}"
+      if docker compose version >/dev/null 2>&1; then
+        docker compose up -d neo4j
+      else
+        docker-compose up -d neo4j
+      fi
+
+      # Wait for Neo4j to start
+      echo -e "${YELLOW}Waiting for Neo4j to start (this may take a minute)...${NC}"
+      sleep 10
+    fi
   fi
 
   echo -e "${GREEN}Neo4j setup complete.${NC}"
@@ -270,16 +302,41 @@ init_schema() {
   source "$VENV_DIR/bin/activate"
 
   # Check if Neo4j is available
-  if [ "$SKIP_NEO4J" = false ] && (command -v docker >/dev/null 2>&1 && docker ps | grep -q "subgraphrag_neo4j"); then
-    echo -e "${GREEN}Running Neo4j schema migration...${NC}"
-    python scripts/migrate_schema.py
+  if [ "$SKIP_NEO4J" = false ]; then
+    # Simple Neo4j connectivity test using Python
+    NEO4J_TEST=$(python -c "
+import os
+from dotenv import load_dotenv
+load_dotenv()
+try:
+    from neo4j import GraphDatabase
+    uri = os.getenv('NEO4J_URI', 'neo4j://localhost:7687')
+    user = os.getenv('NEO4J_USER', 'neo4j')
+    password = os.getenv('NEO4J_PASSWORD', 'password')
+    with GraphDatabase.driver(uri, auth=(user, password)) as driver:
+        result = driver.session().run('RETURN 1 as n')
+        print('connected')
+except Exception as e:
+    print(f'error: {str(e)}')
+" 2>/dev/null)
+    
+    if [[ $NEO4J_TEST == *"connected"* ]]; then
+      echo -e "${GREEN}Neo4j connection successful.${NC}"
+      echo -e "${GREEN}Running Neo4j schema migration...${NC}"
+      python scripts/migrate_schema.py
+    else
+      echo -e "${YELLOW}Neo4j connection failed: $NEO4J_TEST${NC}"
+      echo -e "${YELLOW}Skipping schema migration. Make sure Neo4j is running and credentials are correct in .env file.${NC}"
+    fi
   else
-    echo -e "${YELLOW}Neo4j not available. Skipping schema migration.${NC}"
+    echo -e "${YELLOW}Neo4j setup skipped. Skipping schema migration.${NC}"
   fi
 
   # Initialize SQLite staging database
   echo -e "${GREEN}Initializing SQLite staging database...${NC}"
   if [ ! -f "data/staging.db" ]; then
+    mkdir -p data
+    echo -e "${GREEN}Creating SQLite staging database...${NC}"
     python -c "
 import sqlite3, os
 os.makedirs('data', exist_ok=True)
@@ -310,9 +367,35 @@ load_sample_data() {
     return 0
   fi
 
+  # Check Neo4j connectivity first
+  NEO4J_TEST=$(python -c "
+import os
+from dotenv import load_dotenv
+load_dotenv()
+try:
+    from neo4j import GraphDatabase
+    uri = os.getenv('NEO4J_URI', 'neo4j://localhost:7687')
+    user = os.getenv('NEO4J_USER', 'neo4j')
+    password = os.getenv('NEO4J_PASSWORD', 'password')
+    with GraphDatabase.driver(uri, auth=(user, password)) as driver:
+        result = driver.session().run('RETURN 1 as n')
+        print('connected')
+except Exception as e:
+    print(f'error: {str(e)}')
+" 2>/dev/null)
+
+  if [[ $NEO4J_TEST != *"connected"* ]]; then
+    echo -e "${YELLOW}Neo4j connection failed. Cannot load sample data without Neo4j.${NC}"
+    echo -e "${YELLOW}Make sure Neo4j is running and credentials are correct in .env file.${NC}"
+    return 1
+  fi
+
   echo -e "${BLUE}Loading sample data...${NC}"
 
   source "$VENV_DIR/bin/activate"
+
+  # Create directories if they don't exist
+  mkdir -p data/faiss data/sample_data
 
   # Stage sample data
   python scripts/stage_ingest.py --sample
@@ -362,10 +445,17 @@ show_next_steps() {
   echo -e "2. Access the API at: ${YELLOW}http://localhost:8000${NC}"
   echo -e "3. View API documentation at: ${YELLOW}http://localhost:8000/docs${NC}"
   echo -e "4. Access Neo4j browser at: ${YELLOW}http://localhost:7474${NC}"
-  echo -e "   (username: neo4j, password: password)"
+  if [ "$USE_LOCAL_NEO4J" = true ]; then
+    echo -e "   (Make sure you're using the credentials from your .env file)"
+  else
+    echo -e "   (username: neo4j, password: password)"
+  fi
   echo -e ""
   echo -e "5. Run tests: ${YELLOW}./bin/run_tests.sh${NC}"
   echo -e "6. Run benchmarks: ${YELLOW}./bin/run_benchmark.sh${NC}"
+  echo -e ""
+  echo -e "${YELLOW}Note:${NC} If you used local Neo4j installation (--use-local-neo4j), ensure it's running"
+  echo -e "before starting the development server."
   echo -e ""
   echo -e "For more information, see the documentation in the ${YELLOW}docs/${NC} directory."
 }

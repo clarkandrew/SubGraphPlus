@@ -6,11 +6,12 @@ This document outlines best practices for deploying SubgraphRAG+ in different en
 
 1. [Overview](#overview)
 2. [Docker Deployment (Recommended)](#docker-deployment-recommended)
-3. [Local Development Setup](#local-development-setup)
-4. [Production Deployment](#production-deployment)
-5. [Monitoring and Maintenance](#monitoring-and-maintenance)
-6. [Security Considerations](#security-considerations)
-7. [Troubleshooting](#troubleshooting)
+3. [Local Neo4j Deployment](#local-neo4j-deployment)
+4. [Local Development Setup](#local-development-setup)
+5. [Production Deployment](#production-deployment)
+6. [Monitoring and Maintenance](#monitoring-and-maintenance)
+7. [Security Considerations](#security-considerations)
+8. [Troubleshooting](#troubleshooting)
 
 ## Overview
 
@@ -81,12 +82,105 @@ Docker volumes are used to persist data:
 # Backups are stored in ./backups
 ```
 
+## Local Neo4j Deployment
+
+If you prefer not to use Docker for deploying Neo4j, you can install and run Neo4j directly on your server or local machine.
+
+### Prerequisites
+
+- Operating system: Linux, macOS, or Windows
+- Java Runtime Environment (JRE) 11+
+
+### Installation Options
+
+#### Option 1: Neo4j Desktop (Best for development)
+
+1. Download Neo4j Desktop from [neo4j.com/download](https://neo4j.com/download/)
+2. Install and run Neo4j Desktop
+3. Create a new project and add a local database (version 4.4+ recommended)
+4. Set password to a secure value
+5. Install the APOC plugin via the Plugins tab
+6. Start the database
+
+#### Option 2: Direct Installation
+
+##### On macOS with Homebrew:
+
+```bash
+# Install Neo4j
+brew install neo4j
+
+# Start the service
+brew services start neo4j
+
+# Set password (will prompt for password change)
+cypher-shell -u neo4j -p neo4j
+
+# Install APOC plugin manually
+# 1. Download the APOC plugin JAR
+wget https://github.com/neo4j-contrib/neo4j-apoc-procedures/releases/download/4.4.0.10/apoc-4.4.0.10-all.jar
+# 2. Move it to Neo4j plugins directory
+mv apoc-4.4.0.10-all.jar /usr/local/var/neo4j/plugins/
+# 3. Restart Neo4j
+brew services restart neo4j
+```
+
+##### On Linux (Debian/Ubuntu):
+
+```bash
+# Add Neo4j repository
+wget -O - https://debian.neo4j.com/neotechnology.gpg.key | sudo apt-key add -
+echo 'deb https://debian.neo4j.com stable latest' | sudo tee -a /etc/apt/sources.list.d/neo4j.list
+sudo apt-get update
+
+# Install Neo4j
+sudo apt-get install neo4j=1:4.4.0
+
+# Start Neo4j service
+sudo systemctl start neo4j
+
+# Set password
+cypher-shell -u neo4j -p neo4j
+
+# Install APOC plugin manually
+sudo wget https://github.com/neo4j-contrib/neo4j-apoc-procedures/releases/download/4.4.0.10/apoc-4.4.0.10-all.jar -P /var/lib/neo4j/plugins/
+sudo systemctl restart neo4j
+```
+
+### Configuration
+
+Edit the Neo4j configuration file to enable remote connections and APOC procedures:
+
+```bash
+# Location varies by installation method:
+# - Homebrew: /usr/local/var/neo4j/conf/neo4j.conf
+# - Linux: /etc/neo4j/neo4j.conf
+# - Neo4j Desktop: Via the Settings tab in the application
+
+# Add or uncomment these lines:
+dbms.connector.bolt.enabled=true
+dbms.connector.bolt.listen_address=0.0.0.0:7687
+dbms.connector.http.enabled=true
+dbms.connector.http.listen_address=0.0.0.0:7474
+dbms.security.procedures.unrestricted=apoc.*
+```
+
+### Connecting SubgraphRAG+ to local Neo4j
+
+Update your `.env` file with the appropriate connection details:
+
+```
+NEO4J_URI=neo4j://localhost:7687
+NEO4J_USER=neo4j
+NEO4J_PASSWORD=your_password_here
+```
+
 ## Local Development Setup
 
 ### Prerequisites
 
 - Python 3.11+
-- Neo4j 4.4+ with APOC plugin
+- Neo4j 4.4+ with APOC plugin (Docker or locally installed)
 - SQLite3
 - Git
 
@@ -101,11 +195,13 @@ cd SubgraphRAGPlus
 chmod +x make-executable.sh
 ./make-executable.sh
 
-# Run setup script
-./setup.sh
+# Run setup script with local Neo4j option
+./setup.sh --use-local-neo4j
 
-# Start Neo4j (if installed locally)
-# Otherwise, ensure Neo4j is running and accessible
+# If using locally installed Neo4j, ensure it's running:
+# - Neo4j Desktop: Start from the application
+# - Homebrew: brew services start neo4j
+# - Linux: sudo systemctl start neo4j
 
 # Start the API server
 ./run.sh
@@ -314,8 +410,18 @@ SubgraphRAG+ provides several endpoints for monitoring:
 ### Common Issues
 
 **Neo4j Connection Failures**:
-- Check Neo4j logs: `docker logs subgraphrag_neo4j`
-- Verify Neo4j is running: `docker ps | grep neo4j`
+- For Docker Neo4j:
+  - Check Neo4j logs: `docker logs subgraphrag_neo4j`
+  - Verify Neo4j is running: `docker ps | grep neo4j`
+- For local Neo4j:
+  - Check logs:
+    - Homebrew: `cat /usr/local/var/log/neo4j/neo4j.log`
+    - Linux: `sudo journalctl -u neo4j`
+    - Neo4j Desktop: View logs in the application
+  - Verify Neo4j is running:
+    - Homebrew: `brew services list | grep neo4j`
+    - Linux: `sudo systemctl status neo4j`
+    - Neo4j Desktop: Check status in the application
 - Ensure correct password in environment variables
 
 **API Server Errors**:
