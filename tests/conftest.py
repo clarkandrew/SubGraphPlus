@@ -44,7 +44,7 @@ def mock_config():
         mock.MODEL_BACKEND = "openai"
         mock.FAISS_INDEX_PATH = "data/test_faiss_index.bin"
         mock.TOKEN_BUDGET = 2000
-        mock.MLP_MODEL_PATH = "models/test_mlp_model.pt"
+        mock.MLP_MODEL_PATH = "models/mlp/mlp.pth"
         mock.CACHE_DIR = "cache/"
         mock.MAX_DDE_HOPS = 2
         mock.LOG_LEVEL = "INFO"

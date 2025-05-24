@@ -19,7 +19,7 @@
     },
     "MLP_MODEL_PATH": {
       "type": "string",
-      "default": "models/mlp_pretrained.pt",
+      "default": "models/mlp/mlp.pth",
       "description": "Path to pre-trained SubgraphRAG MLP model"
     },
     "CACHE_DIR": {

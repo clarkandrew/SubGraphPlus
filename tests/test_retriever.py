@@ -36,7 +36,7 @@ class TestRetriever(unittest.TestCase):
         
         # Test with non-existent triple ID
         embedding = get_triple_embedding_from_faiss("nonexistent")
-        self.assertEqual(embedding.shape, (384,))  # Should return zero vector of correct shape
+        self.assertEqual(embedding.shape, (1536,))  # Should return zero vector with OpenAI dimension
         self.assertTrue(np.all(embedding == 0))  # All zeros
     
     @patch('app.retriever.mlp_model')
@@ -108,9 +108,12 @@ class TestRetriever(unittest.TestCase):
         # Check that Neo4j was called with correct args
         mock_neo4j.run_query.assert_called_once()
         args, kwargs = mock_neo4j.run_query.call_args
-        self.assertEqual(kwargs["entity_ids"], entity_ids)
-        self.assertEqual(kwargs["hops"], 2)
-        self.assertEqual(kwargs["limit"], 100)
+        # The parameters are passed as the second positional argument (a dict)
+        self.assertEqual(len(args), 2)  # query string and params dict
+        params_dict = args[1]  # Second argument is the parameters dictionary
+        self.assertEqual(params_dict["entity_ids"], entity_ids)
+        self.assertEqual(params_dict["hops"], 2)
+        self.assertEqual(params_dict["limit"], 100)
     
     @patch('app.retriever.neo4j_db')
     @patch('app.retriever.faiss_index')
@@ -149,7 +152,9 @@ class TestRetriever(unittest.TestCase):
         # Check that Neo4j was called with correct args
         mock_neo4j.run_query.assert_called_once()
         args, kwargs = mock_neo4j.run_query.call_args
-        self.assertEqual(kwargs["triple_ids"], ["rel1"])
+        self.assertEqual(len(args), 2)  # query string and params dict
+        params_dict = args[1]  # Second argument is the parameters dictionary
+        self.assertEqual(params_dict["triple_ids"], ["rel1"])
     
     @patch('app.retriever.embed_query_cached')
     @patch('app.retriever.get_dde_for_entities')
@@ -245,8 +250,10 @@ class TestRetriever(unittest.TestCase):
         # Check that Neo4j was called with correct args
         mock_neo4j.run_query.assert_called_once()
         args, kwargs = mock_neo4j.run_query.call_args
-        self.assertEqual(kwargs["search_term"], "Elon")
-        self.assertEqual(kwargs["limit"], 10)
+        self.assertEqual(len(args), 2)  # query string and params dict
+        params_dict = args[1]  # Second argument is the parameters dictionary
+        self.assertEqual(params_dict["search_term"], "Elon")
+        self.assertEqual(params_dict["limit"], 10)
 
 
 if __name__ == '__main__':
