@@ -52,7 +52,7 @@ cd SubgraphRAGPlus
 make setup-all
 
 # Verify installation
-curl -X POST "http://localhost:8000/api/v1/query" \
+curl -X POST "http://localhost:8000/query" \
   -H "X-API-KEY: your-api-key" \
   -H "Content-Type: application/json" \
   -d '{"question": "What is artificial intelligence?", "visualize_graph": true}'
@@ -97,7 +97,7 @@ After setup, verify your installation:
 
 ```bash
 # Health check
-curl http://localhost:8000/health
+curl http://localhost:8000/healthz
 
 # API documentation
 open http://localhost:8000/docs  # macOS
@@ -204,7 +204,8 @@ API_RATE_LIMIT=100
 
 ### Health Monitoring
 
-- **Health endpoint**: `GET /health`
+- **Health endpoint**: `GET /healthz`
+- **Readiness endpoint**: `GET /readyz` 
 - **Metrics endpoint**: `GET /metrics`
 - **Neo4j Browser**: http://localhost:7474
 
@@ -216,35 +217,32 @@ API_RATE_LIMIT=100
 import requests
 
 response = requests.post(
-    "http://localhost:8000/api/v1/query",
+    "http://localhost:8000/query",
     headers={"X-API-KEY": "your-api-key"},
     json={
         "question": "What is machine learning?",
-        "visualize_graph": True,
-        "max_results": 10
+        "visualize_graph": True
     }
 )
 
-data = response.json()
-print(f"Answer: {data['answer']}")
-print(f"Sources: {len(data['sources'])} found")
+# For streaming response, iterate through lines
+for line in response.iter_lines():
+    if line:
+        print(line.decode('utf-8'))
 ```
 
-### Streaming Response
+### Health Check
 
 ```python
 import requests
 
-response = requests.post(
-    "http://localhost:8000/api/v1/query/stream",
-    headers={"X-API-KEY": "your-api-key"},
-    json={"question": "Explain artificial intelligence"},
-    stream=True
-)
+# Basic health check
+health = requests.get("http://localhost:8000/healthz")
+print(health.json())
 
-for line in response.iter_lines():
-    if line:
-        print(line.decode('utf-8'))
+# Readiness check (with dependencies)
+readiness = requests.get("http://localhost:8000/readyz")
+print(readiness.json())
 ```
 
 ## 🤝 Contributing
