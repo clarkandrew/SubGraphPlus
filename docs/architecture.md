@@ -1,147 +1,231 @@
 # SubgraphRAG+ Architecture
 
-This document provides a concise overview of the SubgraphRAG+ system architecture, outlining key components and their interactions.
+This document provides a detailed technical overview of the SubgraphRAG+ system architecture, focusing on component interactions, data flow, and design decisions.
 
-## System Components
+## System Overview
+
+SubgraphRAG+ implements a hybrid retrieval architecture that combines graph traversal with vector search to provide accurate, contextual answers with explanatory visualizations.
 
 ![Architecture Diagram](../docs/images/architecture.png)
 
-### 1. Core Components
+## Core Components
 
-| Component | File | Key Functions |
-|-----------|------|--------------|
-| **API Layer** | `app/api.py` | FastAPI endpoints, SSE streaming, authentication |
-| **Data Models** | `app/models.py` | Domain models, request/response validation |
-| **Configuration** | `app/config.py` | JSON schema validation, environment variables |
-| **Database Layer** | `app/database.py` | Neo4j and SQLite connections, transaction handling |
+### 1. API Layer (`src/app/api.py`)
+- **FastAPI endpoints** with OpenAPI documentation
+- **SSE streaming** for real-time response delivery
+- **Authentication** via API keys
+- **Rate limiting** and request validation
+- **Health/readiness probes** for monitoring
 
-### 2. Retrieval Components
+### 2. Data Models (`src/app/models.py`)
+- **Pydantic models** for request/response validation
+- **Domain objects** (Triple, GraphData, QueryRequest)
+- **Type safety** and automatic serialization
+- **JSON schema** generation for API docs
 
-| Component | File | Key Functions |
-|-----------|------|--------------|
-| **Retriever** | `app/retriever.py` | Hybrid retrieval, FAISS management, subgraph assembly |
-| **Entity Linking** | `app/utils.py` | Query entity extraction, KG linking, fuzzy matching |
-| **ML Components** | `app/ml/` | Text embedding, LLM integration, triple scoring |
+### 3. Configuration Management (`src/app/config.py`)
+- **JSON schema validation** for config files
+- **Environment variable** handling
+- **Backend abstraction** for different LLM providers
+- **Runtime configuration** updates
 
-### 3. Auxiliary Components
+### 4. Database Layer (`src/app/database.py`)
+- **Neo4j connection** management with connection pooling
+- **SQLite staging** for ingestion queue and auth
+- **Transaction handling** with rollback support
+- **Connection health monitoring**
 
-| Component | File | Key Functions |
-|-----------|------|--------------|
-| **Verification** | `app/verify.py` | LLM output validation, citation checking |
-| **Scripts** | `scripts/` | Migrations, ingestion workers, FAISS management |
+## Retrieval Architecture
 
-## Data Flow
-
-### 1. Query Processing Flow
-
-```mermaid
-graph LR
-    A[User Query] --> B[API Endpoint]
-    B --> C[Entity Extraction]
-    C --> D[Entity Linking]
-    D --> E[Hybrid Retrieval]
-    E --> F[MLP Scoring]
-    F --> G[Subgraph Assembly]
-    G --> H[LLM Answer Generation]
-    H --> I[Answer Verification]
-    I --> J[Streaming Response]
-```
-
-### 2. Ingest Flow
+### 1. Hybrid Retriever (`src/app/retriever.py`)
+The core retrieval engine implements a two-stage process:
 
 ```mermaid
 graph LR
-    A[API Endpoint] --> B[Validation]
-    B --> C[SQLite Staging]
-    C --> D[Ingest Worker]
-    D --> E[Neo4j Transaction]
-    D --> F[Embedding Computation]
-    F --> G[FAISS Staging]
-    G --> H[Periodic FAISS Merge]
+    A[Query] --> B[Entity Extraction]
+    B --> C[Entity Linking]
+    C --> D[Graph Traversal]
+    C --> E[Vector Search]
+    D --> F[Subgraph Assembly]
+    E --> F
+    F --> G[MLP Scoring]
+    G --> H[Context Selection]
 ```
 
-## Core Data Structures
+**Stage 1: Candidate Retrieval**
+- **Entity extraction** from natural language queries
+- **Fuzzy matching** to link entities to knowledge graph
+- **Graph traversal** using Neo4j Cypher queries
+- **Vector search** using FAISS for semantic similarity
 
-### 1. Triple
-The fundamental unit of the knowledge graph: (head, relation, tail)
+**Stage 2: Relevance Scoring**
+- **MLP scoring model** for triple relevance
+- **Subgraph assembly** with path-based ranking
+- **Context window optimization** within token budget
 
-```python
-@dataclass
-class Triple:
-    id: str                # Unique identifier
-    head_id: str           # Head entity ID
-    head_name: str         # Head entity name
-    relation_id: str       # Relation ID
-    relation_name: str     # Relation name
-    tail_id: str           # Tail entity ID
-    tail_name: str         # Tail entity name
-    properties: dict       # Additional properties
-    embedding: ndarray     # Vector embedding
-    relevance_score: float # Relevance to query
+### 2. Entity Linking (`src/app/utils.py`)
+- **Named entity recognition** using spaCy
+- **Fuzzy string matching** with configurable thresholds
+- **Graph-based disambiguation** using node connectivity
+- **Caching** for frequent entity lookups
+
+### 3. ML Components (`src/app/ml/`)
+- **Text embedding** with multiple backend support
+- **LLM integration** (OpenAI, HuggingFace, MLX)
+- **Triple scoring** with pre-trained MLP models
+- **Batch processing** for efficiency
+
+## Data Flow Architecture
+
+### Query Processing Pipeline
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant API
+    participant Retriever
+    participant Neo4j
+    participant FAISS
+    participant LLM
+    
+    Client->>API: POST /query
+    API->>Retriever: process_query()
+    Retriever->>Neo4j: entity_linking()
+    Retriever->>Neo4j: graph_traversal()
+    Retriever->>FAISS: vector_search()
+    Retriever->>Retriever: subgraph_assembly()
+    Retriever->>LLM: generate_answer()
+    LLM-->>API: SSE stream
+    API-->>Client: streamed response
 ```
 
-### 2. GraphData
-D3.js compatible visualization structure
+### Ingestion Pipeline
 
-```python
-@dataclass
-class GraphData:
-    nodes: List[GraphNode]     # Graph nodes (entities)
-    links: List[GraphLink]     # Graph edges (relations)
-    relevant_paths: List[Dict] # Multi-hop paths
+```mermaid
+sequenceDiagram
+    participant Client
+    participant API
+    participant SQLite
+    participant Worker
+    participant Neo4j
+    participant FAISS
+    
+    Client->>API: POST /ingest
+    API->>SQLite: stage_triples()
+    Worker->>SQLite: fetch_pending()
+    Worker->>Neo4j: create_nodes_relations()
+    Worker->>FAISS: compute_embeddings()
+    Worker->>SQLite: mark_processed()
+    Note over FAISS: Periodic merge
 ```
-
-## Performance-Critical Components
-
-| Component | Performance Considerations |
-|-----------|----------------------------|
-| **Entity Linking** | Query understanding bottleneck |
-| **FAISS Search** | Vector search scales with index size |
-| **Subgraph Assembly** | Graph algorithms for triple selection |
-| **LLM Integration** | API latency or local inference time |
 
 ## Storage Architecture
 
-| Storage | Purpose | Key Features |
-|---------|---------|--------------|
-| **Neo4j** | Knowledge graph | Nodes (entities), relationships, properties, indexes |
-| **FAISS** | Vector index | Triple embeddings, semantic search, quantization |
-| **SQLite** | Staging & auth | Ingestion queue, API keys, feedback storage |
-| **Disk Cache** | Performance | Embedding cache, DDE cache, LRU eviction |
+### 1. Neo4j Knowledge Graph
+- **Nodes**: Entities with properties and labels
+- **Relationships**: Typed connections between entities
+- **Indexes**: Optimized for entity name lookups
+- **Constraints**: Ensure data integrity
 
-## Key Design Decisions
+```cypher
+// Example schema
+CREATE CONSTRAINT entity_id IF NOT EXISTS FOR (e:Entity) REQUIRE e.id IS UNIQUE;
+CREATE INDEX entity_name IF NOT EXISTS FOR (e:Entity) ON (e.name);
+CREATE INDEX relation_type IF NOT EXISTS FOR ()-[r:RELATION]-() ON (r.type);
+```
 
-| Decision | Rationale | Trade-offs |
-|----------|-----------|------------|
-| **Hybrid Retrieval** | Combines graph traversal precision with vector search recall | Added complexity for better quality |
-| **SQLite Staging** | Transactional safety, deduplication, failure resilience | Slight latency increase for reliability |
-| **Backend Abstraction** | Support multiple LLM/embedding backends without code changes | Abstraction overhead for flexibility |
-| **SSE Streaming** | Token-by-token streaming with typed events | More complex client handling but better UX |
+### 2. FAISS Vector Index
+- **Triple embeddings** for semantic search
+- **Quantization** for memory efficiency
+- **Staging area** for incremental updates
+- **Periodic merging** to maintain performance
 
-## Scaling & Security
+### 3. SQLite Staging Database
+- **Ingestion queue** with status tracking
+- **API key management** with rate limiting
+- **Error logging** for failed operations
+- **Feedback storage** for model improvement
 
-### Scalability 
+## Performance Optimizations
 
-| Area | Current Capability | Future Extensions |
-|------|-------------------|-------------------|
-| **Vertical** | FAISS: Millions of triples<br>Neo4j: Tens of millions of nodes | Optimized memory usage<br>Improved query planning |
-| **Horizontal** | Limited | Neo4j read replicas<br>Distributed FAISS<br>API load balancing |
-| **Bottlenecks** | LLM inference latency<br>FAISS index size<br>Neo4j query complexity | Streaming responses<br>Quantization<br>Query optimization |
+### 1. Caching Strategy
+- **Entity linking cache** (LRU eviction)
+- **DDE feature cache** for graph patterns
+- **Embedding cache** for computed vectors
+- **Query result cache** for frequent patterns
 
-### Security
+### 2. Indexing Strategy
+- **Neo4j indexes** on entity names and IDs
+- **FAISS quantization** for large-scale vector search
+- **SQLite indexes** on staging table status
+- **Composite indexes** for complex queries
 
-| Feature | Implementation |
-|---------|---------------|
-| **Authentication** | API key-based with environment variable storage |
-| **Protection** | Input validation, LLM output verification, rate limiting |
-| **Monitoring** | Logging, Prometheus metrics, health/readiness probes |
+### 3. Concurrency Model
+- **Async/await** for I/O operations
+- **Connection pooling** for database connections
+- **Background workers** for ingestion processing
+- **Rate limiting** to prevent resource exhaustion
 
-## Future Extensions
+## Scalability Considerations
 
-| Area | Planned Features |
-|------|-----------------|
-| **Multitenancy** | Tenant isolation, dedicated indices, key mapping |
-| **Monitoring** | Request tracing, performance profiling, alerting |
-| **Learning** | Feedback-driven fine-tuning, evaluation pipeline |
+### Current Capabilities
+- **FAISS**: Millions of triples with quantization
+- **Neo4j**: Tens of millions of nodes/relationships
+- **Concurrent users**: Limited by LLM backend latency
+- **Ingestion rate**: ~1000 triples/second
 
-The modular architecture provides a solid foundation while enabling future extensions for scaling, security, and continuous improvement.
+### Scaling Strategies
+- **Horizontal scaling**: Neo4j read replicas
+- **Distributed FAISS**: Sharded vector indexes
+- **API load balancing**: Multiple service instances
+- **Caching layers**: Redis for shared state
+
+## Security Architecture
+
+### 1. Authentication & Authorization
+- **API key-based** authentication
+- **Environment variable** storage for secrets
+- **Rate limiting** per API key
+- **Request validation** with Pydantic
+
+### 2. Input Validation
+- **Schema validation** for all inputs
+- **SQL injection prevention** via parameterized queries
+- **XSS protection** in API responses
+- **File upload restrictions** for ingestion
+
+### 3. Monitoring & Logging
+- **Structured logging** with correlation IDs
+- **Health checks** for all dependencies
+- **Metrics collection** for performance monitoring
+- **Error tracking** with stack traces
+
+## Extension Points
+
+### 1. Backend Abstraction
+The system supports multiple backends through a common interface:
+
+```python
+class LLMBackend(ABC):
+    @abstractmethod
+    async def generate(self, prompt: str, **kwargs) -> AsyncIterator[str]:
+        pass
+    
+    @abstractmethod
+    async def embed(self, texts: List[str]) -> np.ndarray:
+        pass
+```
+
+### 2. Plugin Architecture
+- **Custom retrievers** via inheritance
+- **Additional data sources** through adapters
+- **Custom scoring models** with standardized interfaces
+- **Visualization backends** for different frontends
+
+### 3. Future Enhancements
+- **Multi-tenant isolation** with namespace support
+- **Federated search** across multiple knowledge graphs
+- **Real-time learning** from user feedback
+- **Advanced reasoning** with symbolic AI integration
+
+This modular architecture enables incremental improvements while maintaining system stability and performance.

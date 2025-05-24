@@ -115,3 +115,8 @@ evaluation/results.json
 evaluation/metrics.json
 evaluation/benchmark_report.html
 .gitsmart
+.mypy_cache
+.ropeproject
+cache
+.env
+list_file_tree.py

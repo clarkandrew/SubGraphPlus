@@ -37,9 +37,9 @@ setup-prod:
 .PHONY: lint
 lint:
 	@echo "Running linting checks..."
-	flake8 app/ tests/ scripts/
-	black --check app/ tests/ scripts/
-	isort --check app/ tests/ scripts/
+	flake8 src/ tests/ scripts/
+	black --check src/ tests/ scripts/
+	isort --check src/ tests/ scripts/
 	@echo "Linting complete!"
 
 # Run tests
@@ -105,7 +105,31 @@ serve-prod:
 		sleep 10; \
 	fi
 	@echo "Starting production server now..."
-	@. venv/bin/activate && uvicorn app.api:app --host 0.0.0.0 --port 8000 --workers 4
+	@. venv/bin/activate && uvicorn src.app.api:app --host 0.0.0.0 --port 8000 --workers 4
+
+# Docker commands using files in deployment directory
+.PHONY: docker-start
+docker-start:
+	@echo "Starting Docker services..."
+	cd deployment && $(DOCKER_COMPOSE) up -d
+
+.PHONY: docker-stop
+docker-stop:
+	@echo "Stopping Docker services..."
+	cd deployment && $(DOCKER_COMPOSE) down
+
+.PHONY: docker-build
+docker-build:
+	@echo "Building Docker images..."
+	cd deployment && $(DOCKER_COMPOSE) build
+
+# Complete setup with Docker
+.PHONY: setup-all
+setup-all: setup-dev docker-start migrate-schema ingest-sample
+	@echo "Complete setup finished! 🎉"
+	@echo "Access the API at: http://localhost:8000"
+	@echo "API documentation: http://localhost:8000/docs" 
+	@echo "Neo4j browser: http://localhost:7474"
 
 # Start Neo4j container
 .PHONY: neo4j-start
@@ -199,69 +223,39 @@ generate-api-docs:
 	@echo "Generating API documentation..."
 	$(PYTHON) scripts/generate_openapi.py
 
-# Start Docker Compose stack
-.PHONY: docker-start
-docker-start:
-	@echo "Starting Docker Compose stack..."
-	$(DOCKER_COMPOSE) up -d
-
-# Stop Docker Compose stack
-.PHONY: docker-stop
-docker-stop:
-	@echo "Stopping Docker Compose stack..."
-	$(DOCKER_COMPOSE) down
-
-# Help command
+# Show help
 .PHONY: help
 help:
 	@echo "SubgraphRAG+ Makefile Commands:"
-	@echo "  setup-dev         : Install development dependencies"
-	@echo "  setup-prod        : Install production dependencies"
-	@echo "  lint              : Run linting checks"
-	@echo "  test              : Run tests"
-	@echo "  serve             : Start server in development mode"
-	@echo "  serve-prod        : Start server in production mode"
-	@echo "  neo4j-start       : Start Neo4j container"
-	@echo "  neo4j-stop        : Stop Neo4j container"
-	@echo "  get-pretrained-mlp: Download pre-trained MLP model"
-	@echo "  ingest-sample     : Ingest sample data"
-	@echo "  demo_quickstart   : Run demo quickstart"
-	@echo "  rebuild-faiss-index: Rebuild FAISS index"
-	@echo "  benchmark         : Run benchmarks"
-	@echo "  clean             : Clean cache and temporary files"
-	@echo "  reset             : Reset all data (use with caution)"
-	@echo "  migrate-schema    : Run Neo4j schema migrations"
-	@echo "  health-check      : Check API health"
-	@echo "  ready-check       : Check API readiness"
-	@echo "  generate-api-docs : Generate API documentation"
-	@echo "  docker-start      : Start Docker Compose stack"
-	@echo "  docker-stop       : Stop Docker Compose stack"
-	@echo "  help              : Show this help message"
-
-# Complete setup - one command to set up everything
-.PHONY: setup-all
-setup-all:
-	@echo "Starting complete setup of SubgraphRAG+..."
-	@echo "Step 1: Installing dependencies..."
-	$(MAKE) setup-dev
-	@echo "Step 2: Starting Neo4j database..."
-	$(MAKE) neo4j-start
-	@echo "Step 3: Downloading pre-trained models..."
-	$(MAKE) get-pretrained-mlp
-	@echo "Step 4: Initializing database schema..."
-	$(MAKE) migrate-schema
-	@echo "Step 5: Loading sample data..."
-	$(MAKE) ingest-sample
-	@echo "Step 6: Running tests to verify setup..."
-	$(MAKE) test
-	@echo "================================================================="
-	@echo "✅ Setup complete! You can now run 'make serve' to start the API."
-	@echo "================================================================="
-
-# Shortcut for setup-all (to make it more discoverable)
-.PHONY: start
-start: setup-all
-
-# Default target
-.PHONY: default
-default: help
+	@echo ""
+	@echo "Setup Commands:"
+	@echo "  setup-all          Complete setup with Docker (recommended)"
+	@echo "  setup-dev          Install development dependencies"
+	@echo "  setup-prod         Install production dependencies"
+	@echo ""
+	@echo "Development Commands:"
+	@echo "  serve              Start development server"
+	@echo "  serve-prod         Start production server"
+	@echo "  test               Run test suite"
+	@echo "  lint               Run code quality checks"
+	@echo ""
+	@echo "Docker Commands:"
+	@echo "  docker-start       Start Docker services"
+	@echo "  docker-stop        Stop Docker services"
+	@echo "  docker-build       Build Docker images"
+	@echo ""
+	@echo "Database Commands:"
+	@echo "  neo4j-start        Start Neo4j container"
+	@echo "  neo4j-stop         Stop Neo4j container"
+	@echo "  migrate-schema     Run database migrations"
+	@echo ""
+	@echo "Data Commands:"
+	@echo "  ingest-sample      Load sample data"
+	@echo "  rebuild-faiss-index Rebuild vector index"
+	@echo ""
+	@echo "Utility Commands:"
+	@echo "  health-check       Check API health"
+	@echo "  ready-check        Check API readiness"
+	@echo "  clean              Clean temporary files"
+	@echo "  reset              Reset all data (careful!)"
+	@echo "  help               Show this help message"

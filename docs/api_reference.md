@@ -1,265 +1,383 @@
-# SubgraphRAG+ API Reference
+# API Reference
 
-This document provides a concise reference for the SubgraphRAG+ API, including all endpoints, parameters, and response formats.
+This document provides detailed technical specifications for the SubgraphRAG+ REST API.
 
-## Base URL & Authentication
+## Base URL
 
-- **Base URL**: `http://localhost:8000`
-- **Authentication**: All endpoints (except health checks) require the `X-API-KEY` header
-  ```
-  X-API-KEY: your_api_key_here
-  ```
-- **API Key Configuration**: Set via the `API_KEY_SECRET` environment variable
+```
+http://localhost:8000
+```
 
-## Endpoints
+## Authentication
 
-### 1. Query Endpoint (`POST /query`)
+All API endpoints require authentication via the `X-API-KEY` header:
 
-Submit a question to be answered using the knowledge graph.
+```bash
+curl -H "X-API-KEY: your_api_key_here" http://localhost:8000/endpoint
+```
 
-**Request:**
+## Core Endpoints
+
+### Query Endpoint
+
+**POST** `/query`
+
+Main question-answering endpoint with Server-Sent Events (SSE) streaming.
+
+#### Request Body
+
 ```json
 {
-  "question": "Who founded Tesla?",
-  "visualize_graph": true
+  "question": "string",
+  "visualize_graph": true,
+  "max_tokens": 500,
+  "temperature": 0.7,
+  "include_citations": true,
+  "stream": true
 }
 ```
 
-**Parameters:**
-- `question` (string, required): The question to answer
-- `visualize_graph` (boolean, optional): Include graph visualization data (default: true)
+#### Parameters
 
-**Response:**
-Server-Sent Events (SSE) stream with the following event types:
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `question` | string | Yes | - | Natural language question |
+| `visualize_graph` | boolean | No | `false` | Include graph visualization data |
+| `max_tokens` | integer | No | `500` | Maximum tokens in response |
+| `temperature` | float | No | `0.7` | LLM temperature (0.0-1.0) |
+| `include_citations` | boolean | No | `true` | Include source citations |
+| `stream` | boolean | No | `true` | Enable SSE streaming |
 
-| Event Type | Description | Example |
-|------------|-------------|---------|
-| `llm_token` | LLM response tokens | `{"token": "Elon "}` |
-| `citation_data` | Citation information | `{"id": "rel123", "text": "Elon Musk -[founded]-> Tesla Inc."}` |
-| `metadata` | Query metadata | `{"trust_score": 0.92, "latency_ms": 1530, "query_id": "q_abc123"}` |
-| `graph_data` | Visualization data | `{"nodes": [...], "links": [...], "relevant_paths": [...]}` |
-| `error` | Error information | `{"code": "NO_ENTITY_MATCH", "message": "No entities found matching the query terms."}` |
-| `end` | Stream end marker | `{"message": "Stream ended"}` |
+#### Response (SSE Stream)
 
-**Error Codes:**
-- 400: `EMPTY_QUERY` - Query is empty
-- 401: `UNAUTHORIZED` - Invalid/missing API key
-- 404: `NO_ENTITY_MATCH` - No matching entities found
-- 409: `AMBIGUOUS_ENTITIES` - Ambiguous entity references
-- 500: `INTERNAL_ERROR` - Server error
+The endpoint returns Server-Sent Events with the following event types:
 
-### 2. Graph Browse Endpoint (`GET /graph/browse`)
+```
+event: token
+data: {"token": "Hello"}
+
+event: citation
+data: {"triple_id": "123", "relevance": 0.95}
+
+event: graph
+data: {"nodes": [...], "links": [...]}
+
+event: complete
+data: {"total_tokens": 150, "processing_time": 2.3}
+```
+
+#### Response (Non-streaming)
+
+```json
+{
+  "answer": "Tesla was founded by Elon Musk in 2003...",
+  "citations": [
+    {
+      "triple_id": "tesla_founder_123",
+      "head": "Tesla",
+      "relation": "founded_by",
+      "tail": "Elon Musk",
+      "relevance_score": 0.95
+    }
+  ],
+  "graph_data": {
+    "nodes": [
+      {
+        "id": "tesla",
+        "name": "Tesla",
+        "type": "Company",
+        "relevance": 0.95
+      }
+    ],
+    "links": [
+      {
+        "source": "tesla",
+        "target": "elon_musk",
+        "relation": "founded_by",
+        "strength": 0.95
+      }
+    ]
+  },
+  "metadata": {
+    "processing_time": 2.3,
+    "total_tokens": 150,
+    "retrieved_triples": 25
+  }
+}
+```
+
+### Graph Browse Endpoint
+
+**GET** `/graph/browse`
 
 Browse the knowledge graph with pagination and filtering.
 
-**Parameters:**
-- `page` (integer, optional): Page number (default: 1)
-- `limit` (integer, optional): Results per page (default: 500, max: 2000)
-- `node_types_filter` (string[], optional): Filter by node types
-- `relation_types_filter` (string[], optional): Filter by relation types
-- `center_node_id` (string, optional): ID of node to center graph on
-- `hops` (integer, optional): Hops from center node (default: 1, max: 3)
-- `search_term` (string, optional): Text search term (min 3 chars)
+#### Query Parameters
 
-**Response:**
-```json
-{
-  "nodes": [
-    {
-      "id": "entity123",
-      "name": "Eiffel Tower",
-      "type": "Landmark",
-      "properties": { "description": "A famous Paris landmark." }
-    }
-  ],
-  "links": [
-    {
-      "source": "entity123",
-      "target": "entity456",
-      "relation_id": "rel456",
-      "relation_name": "locatedIn",
-      "properties": {}
-    }
-  ],
-  "page": 1,
-  "limit": 500,
-  "total_nodes_in_filter": 12000,
-  "total_links_in_filter": 34000,
-  "has_more": true
-}
-```
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `entity` | string | No | - | Filter by entity name |
+| `relation` | string | No | - | Filter by relation type |
+| `limit` | integer | No | `50` | Number of results (max 1000) |
+| `offset` | integer | No | `0` | Pagination offset |
+| `include_properties` | boolean | No | `false` | Include node/edge properties |
 
-### 3. Ingest Endpoint (`POST /ingest`)
+#### Response
 
-Ingest triples into the knowledge graph.
-
-**Request:**
 ```json
 {
   "triples": [
-    {"head": "OpenAI", "relation": "foundedBy", "tail": "Sam Altman"},
-    {"head": "Elon Musk", "relation": "founded", "tail": "Tesla Inc."}
-  ]
+    {
+      "id": "triple_123",
+      "head": "Tesla",
+      "head_id": "tesla_entity",
+      "relation": "founded_by",
+      "relation_id": "founded_by_rel",
+      "tail": "Elon Musk",
+      "tail_id": "elon_musk_entity",
+      "properties": {
+        "year": "2003",
+        "location": "Palo Alto"
+      }
+    }
+  ],
+  "pagination": {
+    "total": 1250,
+    "limit": 50,
+    "offset": 0,
+    "has_next": true
+  }
 }
 ```
 
-**Parameters:**
-- `triples` (array, required): Array of triples to ingest
-  - `head` (string, required): Head entity name
-  - `relation` (string, required): Relation name
-  - `tail` (string, required): Tail entity name
+### Ingestion Endpoint
 
-**Response:**
+**POST** `/ingest`
+
+Batch ingest knowledge graph triples.
+
+#### Request Body
+
+```json
+{
+  "triples": [
+    {
+      "head": "Tesla",
+      "relation": "founded_by",
+      "tail": "Elon Musk",
+      "head_name": "Tesla Inc.",
+      "relation_name": "founded by",
+      "tail_name": "Elon Musk",
+      "properties": {
+        "year": "2003",
+        "confidence": 0.95
+      }
+    }
+  ],
+  "source": "manual_input",
+  "batch_id": "batch_20240101_001"
+}
+```
+
+#### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `triples` | array | Yes | Array of triple objects |
+| `source` | string | No | Data source identifier |
+| `batch_id` | string | No | Batch identifier for tracking |
+
+#### Triple Object
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `head` | string | Yes | Head entity identifier |
+| `relation` | string | Yes | Relation type |
+| `tail` | string | Yes | Tail entity identifier |
+| `head_name` | string | No | Human-readable head name |
+| `relation_name` | string | No | Human-readable relation name |
+| `tail_name` | string | No | Human-readable tail name |
+| `properties` | object | No | Additional properties |
+
+#### Response
+
 ```json
 {
   "status": "accepted",
-  "triples_staged": 2,
-  "errors": [],
-  "message": "Staged 2 triples for ingestion"
+  "batch_id": "batch_20240101_001",
+  "queued_count": 150,
+  "duplicate_count": 5,
+  "error_count": 0,
+  "estimated_processing_time": "2-5 minutes"
 }
 ```
 
-**Error Codes:**
-- 400: `EMPTY_TRIPLES` - No triples provided
-- 400: `VALIDATION_ERROR` - Invalid triples format
-- 401: `UNAUTHORIZED` - Invalid or missing API key
+### Feedback Endpoint
 
-### 4. Feedback Endpoint (`POST /feedback`)
+**POST** `/feedback`
 
-Submit feedback on query results.
+Submit feedback on query responses for model improvement.
 
-**Request:**
+#### Request Body
+
 ```json
 {
-  "query_id": "q_abc123",
-  "is_correct": true,
-  "comment": "Very helpful",
-  "expected_answer": "Elon Musk"
+  "query_id": "query_123",
+  "rating": 4,
+  "feedback_type": "accuracy",
+  "comments": "Good answer but missing recent information",
+  "helpful_citations": ["triple_456", "triple_789"],
+  "unhelpful_citations": ["triple_123"]
 }
 ```
 
-**Parameters:**
-- `query_id` (string, required): ID of the query from metadata
-- `is_correct` (boolean, required): Whether the answer was correct
-- `comment` (string, optional): User comment/feedback
-- `expected_answer` (string, optional): Expected answer if incorrect
+#### Response
 
-**Response:**
 ```json
 {
-  "status": "accepted",
-  "message": "Feedback recorded successfully"
+  "status": "recorded",
+  "feedback_id": "feedback_456"
 }
 ```
 
-### 5. Health & Monitoring Endpoints
+## System Endpoints
 
-**Health Check (`GET /healthz`):**
-- Basic liveness probe
-- Response: `{"status": "ok"}`
+### Health Check
 
-**Readiness Check (`GET /readyz`):**
-- Dependency readiness probe
-- Success response (200):
-  ```json
-  {
-    "status": "ready",
-    "checks": {
-      "sqlite": "ok",
-      "neo4j": "ok",
-      "faiss_index": "ok",
-      "llm_backend": "ok"
+**GET** `/healthz`
+
+Basic health check endpoint.
+
+#### Response
+
+```json
+{
+  "status": "healthy",
+  "timestamp": "2024-01-01T12:00:00Z"
+}
+```
+
+### Readiness Check
+
+**GET** `/readyz`
+
+Comprehensive readiness check including dependencies.
+
+#### Response
+
+```json
+{
+  "status": "ready",
+  "checks": {
+    "neo4j": "connected",
+    "faiss_index": "loaded",
+    "llm_backend": "available"
+  },
+  "timestamp": "2024-01-01T12:00:00Z"
+}
+```
+
+### Metrics
+
+**GET** `/metrics`
+
+Prometheus-compatible metrics endpoint.
+
+#### Response
+
+```
+# HELP subgraphrag_queries_total Total number of queries processed
+# TYPE subgraphrag_queries_total counter
+subgraphrag_queries_total 1234
+
+# HELP subgraphrag_query_duration_seconds Query processing time
+# TYPE subgraphrag_query_duration_seconds histogram
+subgraphrag_query_duration_seconds_bucket{le="1.0"} 100
+subgraphrag_query_duration_seconds_bucket{le="5.0"} 200
+```
+
+## Error Responses
+
+All endpoints return consistent error responses:
+
+```json
+{
+  "error": {
+    "code": "INVALID_REQUEST",
+    "message": "Question parameter is required",
+    "details": {
+      "field": "question",
+      "constraint": "non_empty_string"
     }
-  }
-  ```
-- Error response (503):
-  ```json
-  {
-    "status": "not_ready",
-    "checks": {
-      "sqlite": "ok",
-      "neo4j": "failed",
-      "faiss_index": "ok",
-      "llm_backend": "ok"
-    }
-  }
-  ```
-
-**Metrics (`GET /metrics`):**
-- Prometheus metrics endpoint
-- Returns plain text in Prometheus format:
-  ```
-  http_requests_total{method="POST",endpoint="/query",status="200"} 10.0
-  http_request_duration_seconds_bucket{method="POST",endpoint="/query",le="0.1"} 0.0
-  http_request_duration_seconds_bucket{method="POST",endpoint="/query",le="0.5"} 2.0
-  ...
-  ```
-
-## API Usage Details
-
-### Error Handling
-
-All endpoints use a consistent error format:
-```json
-{
-  "code": "ERROR_CODE",
-  "message": "Human-readable error message",
-  "details": { "additional": "information" }
+  },
+  "request_id": "req_123456"
 }
 ```
 
-**Standard HTTP Status Codes:**
-- 200: Success
-- 202: Accepted (async operations)
-- 400: Bad Request
-- 401: Unauthorized
-- 404: Not Found
-- 409: Conflict
-- 422: Unprocessable Entity
-- 429: Too Many Requests
-- 500: Internal Server Error
-- 503: Service Unavailable
+### Error Codes
 
-### Python Client Example
+| Code | HTTP Status | Description |
+|------|-------------|-------------|
+| `INVALID_REQUEST` | 400 | Malformed request |
+| `UNAUTHORIZED` | 401 | Invalid or missing API key |
+| `RATE_LIMITED` | 429 | Rate limit exceeded |
+| `INTERNAL_ERROR` | 500 | Server error |
+| `SERVICE_UNAVAILABLE` | 503 | Dependency unavailable |
+
+## Rate Limiting
+
+- **Default limit**: 60 requests per minute per API key
+- **Headers included** in responses:
+  - `X-RateLimit-Limit`: Request limit
+  - `X-RateLimit-Remaining`: Remaining requests
+  - `X-RateLimit-Reset`: Reset timestamp
+
+## WebSocket Support
+
+For real-time applications, WebSocket connections are available:
+
+```javascript
+const ws = new WebSocket('ws://localhost:8000/ws');
+ws.send(JSON.stringify({
+  type: 'query',
+  data: { question: 'Who founded Tesla?' }
+}));
+```
+
+## SDK Examples
+
+### Python
 
 ```python
 import requests
-import json
-import sseclient
 
-# Configuration
-api_key = "your_api_key_here"
-base_url = "http://localhost:8000"
-headers = {
-    "Content-Type": "application/json",
-    "X-API-KEY": api_key
-}
-
-# Query example
-def query(question):
-    response = requests.post(
-        f"{base_url}/query",
-        headers=headers,
-        json={"question": question},
-        stream=True
-    )
-    
-    client = sseclient.SSEClient(response)
-    for event in client.events():
-        if event.event == "llm_token":
-            data = json.loads(event.data)
-            print(data["token"], end="")
-        elif event.event == "error":
-            data = json.loads(event.data)
-            print(f"Error: {data['message']}")
-            break
-        elif event.event == "end":
-            print("\nStream ended")
-            break
+response = requests.post(
+    'http://localhost:8000/query',
+    headers={'X-API-KEY': 'your_key'},
+    json={'question': 'Who founded Tesla?'}
+)
 ```
 
-### Additional Information
+### JavaScript
 
-- **Rate Limiting**: 60 requests per minute (configurable)
-- **Versioning**: Current version is v1 (future versions will use `/v2/endpoint` format)
-- **Authentication**: API key must be passed via `X-API-KEY` header
+```javascript
+fetch('http://localhost:8000/query', {
+  method: 'POST',
+  headers: {
+    'X-API-KEY': 'your_key',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    question: 'Who founded Tesla?'
+  })
+});
+```
+
+### cURL
+
+```bash
+curl -X POST "http://localhost:8000/query" \
+  -H "X-API-KEY: your_key" \
+  -H "Content-Type: application/json" \
+  -d '{"question": "Who founded Tesla?"}'
+```

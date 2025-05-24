@@ -18,46 +18,50 @@ SubgraphRAG+ is a knowledge graph-powered QA system that combines structured gra
 
 ```
 SubgraphRAG+/
-├── app/               # Core application code
-├── bin/               # Shell scripts for setup and operation
+├── src/app/           # Core application code
+│   ├── api.py         # FastAPI endpoints
+│   ├── models.py      # Data models
+│   ├── config.py      # Configuration management
+│   ├── database.py    # Database connections
+│   ├── retriever.py   # Hybrid retrieval engine
+│   └── ml/            # ML components
+├── bin/               # Executable scripts for setup and operation
+├── scripts/           # Python utility scripts
+├── tools/             # Development and maintenance utilities
+├── deployment/        # Docker and infrastructure files
 ├── config/            # Configuration files
 ├── data/              # Data storage
-├── docs/              # Additional documentation
-├── evaluation/        # Benchmarking and evaluation tools
-├── examples/          # Example scripts and usage demos
-├── migrations/        # Neo4j schema migrations
-├── models/            # ML model storage
-├── prompts/           # Prompt templates
-├── scripts/           # Utility Python scripts
-└── tests/             # Test suite
+├── docs/              # Detailed documentation
+├── tests/             # Test suite
+├── main.py            # Application entry point
+└── Makefile           # Build and development commands
 ```
 
 ## 📋 Prerequisites
 
-- **Docker Setup** (Recommended for most users):
+- **Docker Setup** (Recommended):
   - Docker Engine 20.10+
   - Docker Compose v2
   - 4GB+ RAM allocated to Docker
   - 10GB+ free disk space
 
-- **Local Development** (Alternative setup):
+- **Local Development** (Alternative):
   - Python 3.11+
-  - Neo4j 4.4+ with APOC plugin (can be installed via `bin/install_neo4j.sh`)
+  - Neo4j 4.4+ with APOC plugin
   - SQLite3
   - Virtual environment (venv, conda, etc.)
   - (Optional) OpenAI API key for OpenAI backend
-  - (Optional) GPU for faster local model inference
 
-## 🚀 Quick Start: Choose ONE Setup Method
+## 🚀 Quick Start
 
-### Method 1: Setup with Make (Recommended for Most Users)
+### Option 1: Docker Setup (Recommended)
 
 ```bash
-# Clone repo
+# Clone and setup
 git clone https://github.com/clarkandrew/SubgraphRAGPlus.git
 cd SubgraphRAGPlus
 
-# Complete setup in one command (requires Docker)
+# Complete setup in one command
 make setup-all
 
 # Test the system
@@ -65,189 +69,188 @@ curl -X POST "http://localhost:8000/query" \
   -H "X-API-KEY: changeme" \
   -H "Content-Type: application/json" \
   -d '{"question": "Who founded Tesla?", "visualize_graph": true}'
-
-# Access interfaces
-# - API Documentation: http://localhost:8000/docs
-# - Neo4j Browser: http://localhost:7474 (user: neo4j, password: password)
 ```
 
-### Method 2: Setup with Shell Scripts (Without Docker)
+### Option 2: Local Development Setup
 
 ```bash
-# Clone repo
+# Clone repository
 git clone https://github.com/clarkandrew/SubgraphRAGPlus.git
 cd SubgraphRAGPlus
 
-# Make scripts executable
-chmod +x bin/*.sh
+# Quick start with interactive setup
+./bin/start.sh
 
-# 1. Install Neo4j locally (skip if you already have Neo4j 4.4+ with APOC)
-./bin/install_neo4j.sh
-
-# 2. Set up development environment (with local Neo4j)
+# Or manual setup
 ./bin/setup_dev.sh --use-local-neo4j
-
-# 3. Start the server
 ./bin/run.sh
-
-# Access interfaces
-# - API Documentation: http://localhost:8000/docs
-# - Neo4j Browser: http://localhost:7474 (user: neo4j, password: password)
 ```
 
-## 🛠️ Development Commands
-## 🔧 Configuration & Commands
+### Access Points
 
-### Available Tools
+- **API Documentation**: http://localhost:8000/docs
+- **Neo4j Browser**: http://localhost:7474 (neo4j/password)
+- **API Endpoint**: http://localhost:8000
 
-#### 1. Makefile Commands (Docker-based Development)
+## 🔧 Development Commands
+
+### Make Commands (Docker-based)
 
 ```bash
-# Complete setup in one step
-make setup-all                   # Complete setup with everything
-
-# Core development commands
-make setup-dev                   # Install development dependencies
-make serve                       # Start the development server
-make serve-prod                  # Start production server
-
-# Testing and quality
-make test                        # Run all tests
-make lint                        # Run code quality checks
-
-# Database management
-make neo4j-start                 # Start Neo4j database (Docker)
-make neo4j-stop                  # Stop Neo4j database
-make migrate-schema              # Initialize database schema
-
-# Data operations
-make ingest-sample               # Load sample data
-make rebuild-faiss-index         # Rebuild the FAISS index
+# Setup and development
+make setup-all          # Complete setup with Docker
+make serve              # Start development server
+make test               # Run test suite
+make lint               # Code quality checks
 
 # Docker operations
-make docker-start                # Start all Docker containers
-make docker-stop                 # Stop all Docker containers
+make docker-start       # Start Docker services
+make docker-stop        # Stop Docker services
+make docker-build       # Build Docker images
 
-# Show all available commands
-make help
+# Database operations
+make neo4j-start        # Start Neo4j container
+make migrate-schema     # Run database migrations
+make ingest-sample      # Load sample data
+
+# Utilities
+make clean              # Clean temporary files
+make help               # Show all commands
 ```
 
-#### 2. Shell Scripts (Non-Docker Development)
-
-All scripts are in the `bin/` directory:
+### Shell Scripts (All setups)
 
 ```bash
-# Basic setup and operation
-./bin/setup_dev.sh [--use-local-neo4j]   # Set up development environment
-./bin/run.sh [--port PORT]               # Start the API server
-./bin/run_tests.sh                       # Run test suite
-./bin/install_neo4j.sh                   # Install Neo4j locally
-./bin/backup.sh                          # Backup the system
+# Core operations
+./bin/start.sh          # Interactive setup and start
+./bin/run.sh            # Start API server
+./bin/run_tests.sh      # Run tests
+./bin/setup_dev.sh      # Development environment setup
 
-# Advanced operations
-./bin/run_benchmark.sh                   # Run performance benchmarks
-./bin/demo.sh                            # Run interactive demo
+# Database management
+./bin/install_neo4j.sh  # Install Neo4j locally
+./bin/setup_docker.sh   # Docker environment setup
+
+# Utilities
+./bin/demo.sh           # Interactive demo
+./bin/backup.sh         # Backup system data
+./bin/run_benchmark.sh  # Performance benchmarks
 ```
 
-### Configuration Options
+## ⚙️ Configuration
 
-Create a `.env` file in the project root with these settings:
+### Environment Variables (.env file)
 
-```
-# Neo4j Connection
-NEO4J_URI=neo4j://localhost:7687    # For local Neo4j
+```bash
+# Database
+NEO4J_URI=neo4j://localhost:7687
 NEO4J_USER=neo4j
 NEO4J_PASSWORD=password
-USE_LOCAL_NEO4J=true                # Set to use local Neo4j
 
-# API Security
+# Security
 API_KEY_SECRET=changeme_in_production
 
-# Model Backend (options: openai, hf, mlx)
+# Model Backend
 MODEL_BACKEND=openai
-# OPENAI_API_KEY=your_openai_key    # Required for OpenAI backend
+# OPENAI_API_KEY=your_key_here
 ```
 
-Edit `config/config.json` for additional settings:
+### Application Config (config/config.json)
 
 ```json
 {
   "MODEL_BACKEND": "openai",
-  "FAISS_INDEX_PATH": "data/faiss/index",
-  "TOKEN_BUDGET": 8000,
-  "MLP_MODEL_PATH": "models/mlp",
-  "CACHE_DIR": "cache"
+  "FAISS_INDEX_PATH": "data/faiss_index.bin",
+  "TOKEN_BUDGET": 4000,
+  "MLP_MODEL_PATH": "models/mlp_pretrained.pt",
+  "CACHE_DIR": "cache/",
+  "MAX_DDE_HOPS": 2,
+  "LOG_LEVEL": "INFO",
+  "API_RATE_LIMIT": 60
 }
 ```
 
-## 📈 API Reference
+## 📊 API Reference
+
+### Core Endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/query` | POST | Main QA endpoint with SSE streaming |
-| `/graph/browse` | GET | Browse knowledge graph with pagination |
+| `/graph/browse` | GET | Browse knowledge graph |
 | `/ingest` | POST | Batch ingest triples |
-| `/feedback` | POST | Submit feedback on answers |
+| `/feedback` | POST | Submit answer feedback |
 | `/healthz` | GET | Health check |
 | `/readyz` | GET | Readiness check |
-| `/metrics` | GET | Prometheus metrics |
 
-See API documentation at http://localhost:8000/docs when running the server.
-
-## 📋 Common Tasks
-
-### 1. Adding Custom Data
+### Example Usage
 
 ```bash
-# Prepare your triples in CSV format (head,relation,tail)
-# Then ingest them:
+# Ask a question
+curl -X POST "http://localhost:8000/query" \
+  -H "X-API-KEY: changeme" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "What is the relationship between Tesla and SpaceX?",
+    "visualize_graph": true,
+    "max_tokens": 500
+  }'
 
-# Using Make
-make ingest-data FILE=path/to/your/triples.csv
-
-# Using Python script
-python scripts/stage_ingest.py --file path/to/your/triples.csv
-python scripts/ingest_worker.py --process-all
-python scripts/merge_faiss.py
+# Ingest new data
+curl -X POST "http://localhost:8000/ingest" \
+  -H "X-API-KEY: changeme" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "triples": [
+      {
+        "head": "Elon Musk",
+        "relation": "founded",
+        "tail": "Neuralink",
+        "head_name": "Elon Musk",
+        "relation_name": "founded",
+        "tail_name": "Neuralink"
+      }
+    ]
+  }'
 ```
 
-### 2. Backing Up and Restoring
+## 🧪 Testing
 
 ```bash
-# Create backup
-./bin/backup.sh create
-
-# Restore backup
-./bin/backup.sh restore backup_20240501_120000
-```
-
-### 3. Running Tests
-
-```bash
-# All tests
+# Run all tests
 make test
+# or
+./bin/run_tests.sh
 
-# Specific tests
-./bin/run_tests.sh -t unit        # Unit tests only
-./bin/run_tests.sh -t integration # Integration tests only
-./bin/run_tests.sh -c             # With coverage report
+# Run specific test categories
+pytest tests/test_api.py -v
+pytest tests/test_retriever.py -v
+pytest tests/test_database.py -v
 ```
 
-### 4. Production Deployment
+## 📚 Documentation
 
-For production deployment, use the Docker setup with these changes:
+- **[Architecture](docs/architecture.md)**: System design and components
+- **[API Reference](docs/api_reference.md)**: Detailed API documentation
+- **[Deployment](docs/deployment.md)**: Production deployment guide
+- **[Troubleshooting](docs/troubleshooting.md)**: Common issues and solutions
 
-1. Update `API_KEY_SECRET` to a strong random value
-2. Configure HTTPS (using Nginx/Traefik as reverse proxy)
-3. Set resource limits in docker-compose.yml
-4. Enable regular backups with `./bin/backup.sh create`
+## 🤝 Contributing
 
-See `docs/deployment.md` for detailed production setup instructions.
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes
+4. Run tests (`make test`)
+5. Commit your changes (`git commit -m 'Add amazing feature'`)
+6. Push to the branch (`git push origin feature/amazing-feature`)
+7. Open a Pull Request
 
-## 📝 License
+## 📄 License
 
-This project is licensed under the Apache License 2.0 - see the `LICENSE` file for details.
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
 
-## 🌟 Acknowledgements
+## 🙏 Acknowledgments
 
-Based on the original [SubgraphRAG paper](https://arxiv.org/abs/2401.09863) (ICLR 2025) with significant enhancements.
+- Built on the SubgraphRAG research framework
+- Uses Neo4j for graph storage and FAISS for vector search
+- Powered by FastAPI and modern Python ecosystem

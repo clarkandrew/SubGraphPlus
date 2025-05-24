@@ -69,11 +69,11 @@ def setup_environment():
 
 def run_app(host: str = '0.0.0.0', port: int = 8000, reload: bool = False):
     """Run the FastAPI application with uvicorn"""
-    import app.api  # Import here after environment setup
+    import src.app.api  # Import here after environment setup
     
     logger.info(f"Starting SubgraphRAG+ server on {host}:{port}")
     uvicorn.run(
-        "app.api:app",
+        "src.app.api:app",
         host=host,
         port=port,
         reload=reload,
