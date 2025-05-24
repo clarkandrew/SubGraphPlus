@@ -439,7 +439,7 @@ show_next_steps() {
   echo "=================================================="
   echo -e "${NC}"
   echo -e "${GREEN}You can now:${NC}"
-  echo -e "1. Start the development server: ${YELLOW}source venv/bin/activate && python main.py --reload${NC}"
+  echo -e "1. Start the development server: ${YELLOW}source venv/bin/activate && python src/main.py --reload${NC}"
   echo -e "   OR use the run script: ${YELLOW}./bin/run.sh${NC}"
   echo -e ""
   echo -e "2. Access the API at: ${YELLOW}http://localhost:8000${NC}"

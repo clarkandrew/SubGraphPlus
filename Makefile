@@ -42,6 +42,21 @@ lint:
 	isort --check src/ tests/ scripts/
 	@echo "Linting complete!"
 
+# Format code
+.PHONY: format
+format:
+	@echo "Formatting code..."
+	black src/ tests/ scripts/
+	isort src/ tests/ scripts/
+	@echo "Code formatting complete!"
+
+# Type checking
+.PHONY: typecheck
+typecheck:
+	@echo "Running type checks..."
+	mypy src/ tests/ scripts/
+	@echo "Type checking complete!"
+
 # Run tests
 .PHONY: test
 test:
@@ -67,6 +82,18 @@ test:
 	}
 	@echo "Tests complete!"
 
+# Run tests with coverage
+.PHONY: test-coverage
+test-coverage:
+	@echo "Running tests with coverage..."
+	@mkdir -p logs
+	@if [ ! -d "venv" ]; then \
+		python3 -m venv venv; \
+		. venv/bin/activate && pip install -r requirements-dev.txt; \
+	fi
+	@. venv/bin/activate && pytest tests/ --cov=src --cov-report=html --cov-report=term
+	@echo "Coverage report generated in htmlcov/"
+
 # Run server in development mode
 .PHONY: serve
 serve:
@@ -85,7 +112,7 @@ serve:
 		sleep 10; \
 	fi
 	@echo "Starting server now..."
-	@. venv/bin/activate && $(PYTHON) main.py --reload
+	@. venv/bin/activate && $(PYTHON) src/main.py --reload
 	
 # Run server in production mode
 .PHONY: serve-prod
@@ -107,6 +134,10 @@ serve-prod:
 	@echo "Starting production server now..."
 	@. venv/bin/activate && uvicorn src.app.api:app --host 0.0.0.0 --port 8000 --workers 4
 
+# Development server with hot reload
+.PHONY: dev-start
+dev-start: serve
+
 # Docker commands using files in deployment directory
 .PHONY: docker-start
 docker-start:
@@ -122,6 +153,11 @@ docker-stop:
 docker-build:
 	@echo "Building Docker images..."
 	cd deployment && $(DOCKER_COMPOSE) build
+
+.PHONY: docker-dev
+docker-dev:
+	@echo "Starting Docker services in development mode..."
+	cd deployment && $(DOCKER_COMPOSE) -f docker-compose.yml -f docker-compose.dev.yml up -d
 
 # Complete setup with Docker
 .PHONY: setup-all
@@ -143,6 +179,10 @@ neo4j-stop:
 	@echo "Stopping Neo4j container..."
 	$(DOCKER) stop neo4j
 	$(DOCKER) rm neo4j
+
+# Restart Neo4j container
+.PHONY: neo4j-restart
+neo4j-restart: neo4j-stop neo4j-start
 
 # Download pre-trained MLP model
 .PHONY: get-pretrained-mlp
@@ -187,6 +227,8 @@ clean:
 	rm -rf __pycache__
 	rm -rf .pytest_cache
 	rm -rf $(CACHE_DIR)/*
+	find . -type f -name "*.pyc" -delete
+	find . -type d -name "__pycache__" -delete
 	@echo "Clean complete!"
 
 # Full reset - USE WITH CAUTION
@@ -217,6 +259,12 @@ ready-check:
 	@echo "Checking API readiness..."
 	curl -s http://localhost:8000/readyz | jq
 
+# View logs
+.PHONY: logs
+logs:
+	@echo "Viewing Docker logs..."
+	cd deployment && $(DOCKER_COMPOSE) logs -f
+
 # Generate API documentation
 .PHONY: generate-api-docs
 generate-api-docs:
@@ -235,18 +283,25 @@ help:
 	@echo ""
 	@echo "Development Commands:"
 	@echo "  serve              Start development server"
+	@echo "  dev-start          Start development server (alias)"
 	@echo "  serve-prod         Start production server"
 	@echo "  test               Run test suite"
+	@echo "  test-coverage      Run tests with coverage report"
 	@echo "  lint               Run code quality checks"
+	@echo "  format             Format code with black and isort"
+	@echo "  typecheck          Run type checking with mypy"
 	@echo ""
 	@echo "Docker Commands:"
 	@echo "  docker-start       Start Docker services"
 	@echo "  docker-stop        Stop Docker services"
 	@echo "  docker-build       Build Docker images"
+	@echo "  docker-dev         Start development with Docker"
+	@echo "  logs               View Docker logs"
 	@echo ""
 	@echo "Database Commands:"
 	@echo "  neo4j-start        Start Neo4j container"
 	@echo "  neo4j-stop         Stop Neo4j container"
+	@echo "  neo4j-restart      Restart Neo4j container"
 	@echo "  migrate-schema     Run database migrations"
 	@echo ""
 	@echo "Data Commands:"

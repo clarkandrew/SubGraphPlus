@@ -120,3 +120,4 @@ evaluation/benchmark_report.html
 cache
 .env
 list_file_tree.py
+tools/

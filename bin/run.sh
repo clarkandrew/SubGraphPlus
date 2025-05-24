@@ -159,8 +159,8 @@ done
 echo -e "${GREEN}Starting SubgraphRAG+ application...${NC}"
 if [ "$DEBUG" = true ]; then
   echo -e "${GREEN}Running in debug mode with auto-reload enabled${NC}"
-  uvicorn main:app --reload --host 0.0.0.0 --port "$PORT"
+  uvicorn src.main:app --reload --host 0.0.0.0 --port "$PORT"
 else
   echo -e "${GREEN}Running in production mode${NC}"
-  uvicorn main:app --host 0.0.0.0 --port "$PORT"
+  uvicorn src.main:app --host 0.0.0.0 --port "$PORT"
 fi
