@@ -3,12 +3,10 @@ import logging
 import time
 import numpy as np
 import faiss
-from pathlib import Path
 import sys
+from pathlib import Path
 import argparse
 
-# Add parent directory to path so we can import app modules
-sys.path.append(str(Path(__file__).parent.parent))
 from app.config import config
 
 # Set up logging

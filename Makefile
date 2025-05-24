@@ -1,316 +1,342 @@
-# Makefile for SubgraphRAG+
+# SubgraphRAG+ Makefile
+# Production-ready build and development commands
 
-# Variables
-PYTHON = python3
-PIP = pip
-DOCKER = docker
-DOCKER_COMPOSE = docker compose
+# ============================================================================
+# Configuration
+# ============================================================================
 
-# Neo4j Container Setup
-NEO4J_PASSWORD ?= password
+# Python and package management
+PYTHON := python3
+PIP := pip3
+VENV := venv
+VENV_PYTHON := $(VENV)/bin/python
+VENV_PIP := $(VENV)/bin/pip
 
-# Directories
-DATA_DIR = ./data
-CACHE_DIR = ./cache
-MODELS_DIR = ./models
-LOGS_DIR = ./logs
+# Docker configuration
+DOCKER := docker
+DOCKER_COMPOSE := docker-compose
+COMPOSE_FILE := docker-compose.yml
+COMPOSE_PROD_FILE := deployment/docker-compose.prod.yml
 
-# Install dependencies
+# Project directories
+SRC_DIR := src
+TESTS_DIR := tests
+DOCS_DIR := docs
+CONFIG_DIR := config
+DATA_DIR := data
+CACHE_DIR := cache
+LOGS_DIR := logs
+
+# Application settings
+APP_MODULE := app.api:app
+HOST := 0.0.0.0
+PORT := 8000
+WORKERS := 4
+
+# ============================================================================
+# Help and Default Target
+# ============================================================================
+
+.DEFAULT_GOAL := help
+
+.PHONY: help
+help: ## Show this help message
+	@echo "🚀 SubgraphRAG+ Development Commands"
+	@echo ""
+	@echo "📦 Setup Commands:"
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | grep "Setup" | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@echo ""
+	@echo "🔧 Development Commands:"
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | grep "Development" | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@echo ""
+	@echo "🐳 Docker Commands:"
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | grep "Docker" | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@echo ""
+	@echo "🗄️ Database Commands:"
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | grep "Database" | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@echo ""
+	@echo "🧪 Testing & Quality Commands:"
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | grep "Testing\|Quality" | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@echo ""
+	@echo "🛠️ Utility Commands:"
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | grep "Utility" | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+
+# ============================================================================
+# Setup Commands
+# ============================================================================
+
+.PHONY: setup-all
+setup-all: ## Setup - Complete Docker setup (recommended)
+	@echo "🚀 Setting up SubgraphRAG+ with Docker..."
+	@./bin/setup_docker.sh
+	@echo "✅ Setup complete! Access: http://localhost:8000/docs"
+
 .PHONY: setup-dev
-setup-dev:
-	@echo "Installing development dependencies..."
-	$(PIP) install -r requirements-dev.txt
-	@echo "Creating necessary directories..."
-	mkdir -p $(DATA_DIR) $(CACHE_DIR) $(MODELS_DIR) $(LOGS_DIR)
-	@echo "Development setup complete!"
+setup-dev: ## Setup - Development environment (uses interactive script)
+	@echo "🔧 Running development environment setup..."
+	@./bin/setup_dev.sh
 
-# Install production dependencies
+.PHONY: setup-dev-quick
+setup-dev-quick: ## Setup - Quick development setup (non-interactive)
+	@echo "🔧 Running quick development setup..."
+	@./bin/setup_dev.sh --skip-tests --skip-sample-data
+
 .PHONY: setup-prod
-setup-prod:
-	@echo "Installing production dependencies..."
-	$(PIP) install -r requirements.txt
-	@echo "Creating necessary directories..."
-	mkdir -p $(DATA_DIR) $(CACHE_DIR) $(MODELS_DIR) $(LOGS_DIR)
-	@echo "Production setup complete!"
+setup-prod: venv install-prod ## Setup - Production environment
+	@echo "🏢 Production environment ready!"
 
-# Run linting
-.PHONY: lint
-lint:
-	@echo "Running linting checks..."
-	flake8 src/ tests/ scripts/
-	black --check src/ tests/ scripts/
-	isort --check src/ tests/ scripts/
-	@echo "Linting complete!"
-
-# Format code
-.PHONY: format
-format:
-	@echo "Formatting code..."
-	black src/ tests/ scripts/
-	isort src/ tests/ scripts/
-	@echo "Code formatting complete!"
-
-# Type checking
-.PHONY: typecheck
-typecheck:
-	@echo "Running type checks..."
-	mypy src/ tests/ scripts/
-	@echo "Type checking complete!"
-
-# Run tests
-.PHONY: test
-test:
-	@echo "Running tests..."
-	@mkdir -p logs
-	@touch logs/app.log
-	@if [ ! -d "venv" ]; then \
-		echo "Virtual environment not found. Creating..."; \
-		python3 -m venv venv; \
-		. venv/bin/activate && pip install -r requirements-dev.txt; \
+.PHONY: venv
+venv: ## Setup - Create Python virtual environment (manual method)
+	@echo "⚠️  Note: Consider using 'make setup-dev' for full setup instead"
+	@if [ ! -d "$(VENV)" ]; then \
+		echo "📦 Creating virtual environment..."; \
+		$(PYTHON) -m venv $(VENV); \
+		$(VENV_PIP) install --upgrade pip setuptools wheel; \
 	fi
-	@echo "Checking if Neo4j is running..."
-	@if ! docker ps | grep -q neo4j; then \
-		echo "Neo4j is not running. Starting Neo4j..."; \
-		$(MAKE) neo4j-start; \
-		echo "Waiting for Neo4j to initialize..."; \
-		sleep 10; \
-	fi
-	@echo "Running tests now..."
-	@. venv/bin/activate && pytest tests/ -v --disable-warnings || { \
-		echo "Tests failed. Please check the error messages above."; \
-		exit 1; \
-	}
-	@echo "Tests complete!"
 
-# Run tests with coverage
-.PHONY: test-coverage
-test-coverage:
-	@echo "Running tests with coverage..."
-	@mkdir -p logs
-	@if [ ! -d "venv" ]; then \
-		python3 -m venv venv; \
-		. venv/bin/activate && pip install -r requirements-dev.txt; \
-	fi
-	@. venv/bin/activate && pytest tests/ --cov=src --cov-report=html --cov-report=term
-	@echo "Coverage report generated in htmlcov/"
+.PHONY: install-dev
+install-dev: venv ## Setup - Install development dependencies (manual method)
+	@echo "⚠️  Note: Consider using 'make setup-dev' for full setup instead"
+	@echo "📦 Installing development dependencies..."
+	@$(VENV_PIP) install -r requirements-dev.txt
+	@$(VENV_PIP) install -e .
 
-# Run server in development mode
+.PHONY: install-prod
+install-prod: venv ## Setup - Install production dependencies (manual method)
+	@echo "⚠️  Note: Consider using 'make setup-dev' for full setup instead"
+	@echo "📦 Installing production dependencies..."
+	@$(VENV_PIP) install -r requirements.txt
+	@$(VENV_PIP) install -e .
+
+# ============================================================================
+# Development Commands
+# ============================================================================
+
 .PHONY: serve
-serve:
-	@echo "Starting SubgraphRAG+ API server..."
-	@mkdir -p logs
-	@if [ ! -d "venv" ]; then \
-		echo "Virtual environment not found. Creating..."; \
-		python3 -m venv venv; \
-		. venv/bin/activate && pip install -r requirements-dev.txt; \
-	fi
-	@echo "Checking if Neo4j is running..."
-	@if ! docker ps | grep -q neo4j; then \
-		echo "Neo4j is not running. Starting Neo4j..."; \
-		$(MAKE) neo4j-start; \
-		echo "Waiting for Neo4j to initialize..."; \
-		sleep 10; \
-	fi
-	@echo "Starting server now..."
-	@. venv/bin/activate && $(PYTHON) src/main.py --reload
-	
-# Run server in production mode
+serve: ## Development - Start development server
+	@echo "🚀 Starting development server..."
+	@$(VENV_PYTHON) $(SRC_DIR)/main.py --reload --host $(HOST) --port $(PORT)
+
 .PHONY: serve-prod
-serve-prod:
-	@echo "Starting SubgraphRAG+ API server in production mode..."
-	@mkdir -p logs
-	@if [ ! -d "venv" ]; then \
-		echo "Virtual environment not found. Creating..."; \
-		python3 -m venv venv; \
-		. venv/bin/activate && pip install -r requirements.txt; \
-	fi
-	@echo "Checking if Neo4j is running..."
-	@if ! docker ps | grep -q neo4j; then \
-		echo "Neo4j is not running. Starting Neo4j..."; \
-		$(MAKE) neo4j-start; \
-		echo "Waiting for Neo4j to initialize..."; \
-		sleep 10; \
-	fi
-	@echo "Starting production server now..."
-	@. venv/bin/activate && uvicorn src.app.api:app --host 0.0.0.0 --port 8000 --workers 4
+serve-prod: ## Development - Start production server
+	@echo "🏢 Starting production server..."
+	@$(VENV_PYTHON) -m uvicorn $(APP_MODULE) --host $(HOST) --port $(PORT) --workers $(WORKERS)
 
-# Development server with hot reload
-.PHONY: dev-start
-dev-start: serve
+.PHONY: shell
+shell: ## Development - Start Python shell with app context
+	@echo "🐍 Starting Python shell..."
+	@$(VENV_PYTHON) -c "from app.api import app; import IPython; IPython.embed()"
 
-# Docker commands using files in deployment directory
-.PHONY: docker-start
-docker-start:
-	@echo "Starting Docker services..."
-	cd deployment && $(DOCKER_COMPOSE) up -d
-
-.PHONY: docker-stop
-docker-stop:
-	@echo "Stopping Docker services..."
-	cd deployment && $(DOCKER_COMPOSE) down
+# ============================================================================
+# Docker Commands
+# ============================================================================
 
 .PHONY: docker-build
-docker-build:
-	@echo "Building Docker images..."
-	cd deployment && $(DOCKER_COMPOSE) build
+docker-build: ## Docker - Build all Docker images
+	@echo "🐳 Building Docker images..."
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) build
 
-.PHONY: docker-dev
-docker-dev:
-	@echo "Starting Docker services in development mode..."
-	cd deployment && $(DOCKER_COMPOSE) -f docker-compose.yml -f docker-compose.dev.yml up -d
+.PHONY: docker-start
+docker-start: ## Docker - Start all services
+	@echo "🐳 Starting Docker services..."
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) up -d
+	@echo "✅ Services started! API: http://localhost:8000"
 
-# Complete setup with Docker
-.PHONY: setup-all
-setup-all: setup-dev docker-start migrate-schema ingest-sample
-	@echo "Complete setup finished! 🎉"
-	@echo "Access the API at: http://localhost:8000"
-	@echo "API documentation: http://localhost:8000/docs" 
-	@echo "Neo4j browser: http://localhost:7474"
+.PHONY: docker-stop
+docker-stop: ## Docker - Stop all services
+	@echo "🛑 Stopping Docker services..."
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) down
 
-# Start Neo4j container
+.PHONY: docker-restart
+docker-restart: docker-stop docker-start ## Docker - Restart all services
+
+.PHONY: docker-logs
+docker-logs: ## Docker - View service logs
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) logs -f
+
+.PHONY: docker-clean
+docker-clean: ## Docker - Clean up containers and volumes
+	@echo "🧹 Cleaning Docker resources..."
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) down -v
+	@$(DOCKER) system prune -f
+
+# ============================================================================
+# Database Commands
+# ============================================================================
+
 .PHONY: neo4j-start
-neo4j-start:
-	@echo "Starting Neo4j container..."
-	$(DOCKER) run --name neo4j -p 7474:7474 -p 7687:7687 -e NEO4J_AUTH=neo4j/$(NEO4J_PASSWORD) -e NEO4J_PLUGINS='["apoc"]' -v $(PWD)/$(DATA_DIR)/neo4j:/data -d neo4j:4.4
+neo4j-start: ## Database - Start Neo4j container
+	@echo "🗄️ Starting Neo4j..."
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) up -d neo4j
+	@echo "⏳ Waiting for Neo4j to be ready..."
+	@sleep 30
+	@echo "✅ Neo4j ready! Browser: http://localhost:7474"
 
-# Stop Neo4j container
 .PHONY: neo4j-stop
-neo4j-stop:
-	@echo "Stopping Neo4j container..."
-	$(DOCKER) stop neo4j
-	$(DOCKER) rm neo4j
+neo4j-stop: ## Database - Stop Neo4j container
+	@echo "🛑 Stopping Neo4j..."
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) stop neo4j
 
-# Restart Neo4j container
 .PHONY: neo4j-restart
-neo4j-restart: neo4j-stop neo4j-start
+neo4j-restart: neo4j-stop neo4j-start ## Database - Restart Neo4j
 
-# Download pre-trained MLP model
-.PHONY: get-pretrained-mlp
-get-pretrained-mlp:
-	@echo "Downloading pre-trained MLP model..."
-	mkdir -p $(MODELS_DIR)
-	@if [ -f $(MODELS_DIR)/mlp_pretrained.pt ]; then \
-		echo "Model already exists"; \
-	else \
-		$(PYTHON) scripts/download_pretrained_mlp.py; \
-	fi
-
-# Ingest sample data
-.PHONY: ingest-sample
-ingest-sample:
-	@echo "Ingesting sample data..."
-	$(PYTHON) scripts/stage_ingest.py --file data/sample_data/sample_triples.csv
-	$(PYTHON) scripts/ingest_worker.py
-
-# Run demo with quickstart
-.PHONY: demo_quickstart
-demo_quickstart:
-	@echo "Running SubgraphRAG+ demo quickstart..."
-	$(PYTHON) scripts/demo_quickstart.py
-
-# Rebuild FAISS index
-.PHONY: rebuild-faiss-index
-rebuild-faiss-index:
-	@echo "Rebuilding FAISS index..."
-	$(PYTHON) scripts/rebuild_faiss_index.py
-
-# Run benchmarks
-.PHONY: benchmark
-benchmark:
-	@echo "Running benchmark tests..."
-	$(PYTHON) scripts/benchmark.py
-
-# Clean cache and temporary files
-.PHONY: clean
-clean:
-	@echo "Cleaning cache and temporary files..."
-	rm -rf __pycache__
-	rm -rf .pytest_cache
-	rm -rf $(CACHE_DIR)/*
-	find . -type f -name "*.pyc" -delete
-	find . -type d -name "__pycache__" -delete
-	@echo "Clean complete!"
-
-# Full reset - USE WITH CAUTION
-.PHONY: reset
-reset:
-	@echo "WARNING: This will reset all data and caches. Press Enter to continue or Ctrl+C to cancel."
-	@read dummy
-	rm -rf $(CACHE_DIR)/*
-	rm -rf $(DATA_DIR)/staging.db
-	rm -rf $(DATA_DIR)/faiss_staging/*
-	@echo "Reset complete!"
-
-# Create basic migrations
 .PHONY: migrate-schema
-migrate-schema:
-	@echo "Running Neo4j schema migrations..."
-	$(PYTHON) scripts/migrate_schema.py --target-version kg_v1
+migrate-schema: ## Database - Apply schema migrations
+	@echo "🔄 Applying database migrations..."
+	@$(VENV_PYTHON) scripts/migrate_schema.py
 
-# Check API health
-.PHONY: health-check
-health-check:
-	@echo "Checking API health..."
-	curl -s http://localhost:8000/healthz | jq
+.PHONY: ingest-sample
+ingest-sample: ## Database - Load sample data
+	@echo "📊 Loading sample data..."
+	@$(VENV_PYTHON) scripts/stage_ingest.py --sample
+	@$(VENV_PYTHON) scripts/ingest_worker.py --process-all
 
-# Check API readiness
-.PHONY: ready-check
-ready-check:
-	@echo "Checking API readiness..."
-	curl -s http://localhost:8000/readyz | jq
+# ============================================================================
+# Testing & Quality Commands
+# ============================================================================
 
-# View logs
-.PHONY: logs
-logs:
-	@echo "Viewing Docker logs..."
-	cd deployment && $(DOCKER_COMPOSE) logs -f
+.PHONY: test
+test: ## Testing - Run test suite
+	@echo "🧪 Running tests..."
+	@$(VENV_PYTHON) -m pytest $(TESTS_DIR)/ -v
 
-# Generate API documentation
-.PHONY: generate-api-docs
-generate-api-docs:
-	@echo "Generating API documentation..."
-	$(PYTHON) scripts/generate_openapi.py
+.PHONY: test-coverage
+test-coverage: ## Testing - Run tests with coverage
+	@echo "🧪 Running tests with coverage..."
+	@$(VENV_PYTHON) -m pytest $(TESTS_DIR)/ --cov=$(SRC_DIR) --cov-report=html --cov-report=term
 
-# Show help
-.PHONY: help
-help:
-	@echo "SubgraphRAG+ Makefile Commands:"
-	@echo ""
-	@echo "Setup Commands:"
-	@echo "  setup-all          Complete setup with Docker (recommended)"
-	@echo "  setup-dev          Install development dependencies"
-	@echo "  setup-prod         Install production dependencies"
-	@echo ""
-	@echo "Development Commands:"
-	@echo "  serve              Start development server"
-	@echo "  dev-start          Start development server (alias)"
-	@echo "  serve-prod         Start production server"
-	@echo "  test               Run test suite"
-	@echo "  test-coverage      Run tests with coverage report"
-	@echo "  lint               Run code quality checks"
-	@echo "  format             Format code with black and isort"
-	@echo "  typecheck          Run type checking with mypy"
-	@echo ""
-	@echo "Docker Commands:"
-	@echo "  docker-start       Start Docker services"
-	@echo "  docker-stop        Stop Docker services"
-	@echo "  docker-build       Build Docker images"
-	@echo "  docker-dev         Start development with Docker"
-	@echo "  logs               View Docker logs"
-	@echo ""
-	@echo "Database Commands:"
-	@echo "  neo4j-start        Start Neo4j container"
-	@echo "  neo4j-stop         Stop Neo4j container"
-	@echo "  neo4j-restart      Restart Neo4j container"
-	@echo "  migrate-schema     Run database migrations"
-	@echo ""
-	@echo "Data Commands:"
-	@echo "  ingest-sample      Load sample data"
-	@echo "  rebuild-faiss-index Rebuild vector index"
-	@echo ""
-	@echo "Utility Commands:"
-	@echo "  health-check       Check API health"
-	@echo "  ready-check        Check API readiness"
-	@echo "  clean              Clean temporary files"
-	@echo "  reset              Reset all data (careful!)"
-	@echo "  help               Show this help message"
+.PHONY: test-integration
+test-integration: ## Testing - Run integration tests
+	@echo "🧪 Running integration tests..."
+	@$(VENV_PYTHON) -m pytest $(TESTS_DIR)/integration/ -v
+
+.PHONY: lint
+lint: ## Quality - Run code linting
+	@echo "🔍 Running linting..."
+	@$(VENV_PYTHON) -m flake8 $(SRC_DIR)/ $(TESTS_DIR)/ scripts/
+	@$(VENV_PYTHON) -m pylint $(SRC_DIR)/ --disable=C0114,C0115,C0116
+
+.PHONY: format
+format: ## Quality - Format code
+	@echo "✨ Formatting code..."
+	@$(VENV_PYTHON) -m black $(SRC_DIR)/ $(TESTS_DIR)/ scripts/
+	@$(VENV_PYTHON) -m isort $(SRC_DIR)/ $(TESTS_DIR)/ scripts/
+
+.PHONY: typecheck
+typecheck: ## Quality - Run type checking
+	@echo "🔍 Running type checks..."
+	@$(VENV_PYTHON) -m mypy $(SRC_DIR)/ --ignore-missing-imports
+
+.PHONY: security
+security: ## Quality - Run security checks
+	@echo "🔒 Running security checks..."
+	@$(VENV_PYTHON) -m bandit -r $(SRC_DIR)/ -f json
+
+.PHONY: quality
+quality: lint typecheck security ## Quality - Run all quality checks
+
+# ============================================================================
+# Utility Commands
+# ============================================================================
+
+.PHONY: health
+health: ## Utility - Check API health
+	@echo "🏥 Checking API health..."
+	@curl -s http://localhost:8000/health | jq '.' || echo "❌ API not responding"
+
+.PHONY: docs-serve
+docs-serve: ## Utility - Serve documentation locally
+	@echo "📚 Serving documentation..."
+	@cd $(DOCS_DIR) && $(PYTHON) -m http.server 8080
+
+.PHONY: clean
+clean: ## Utility - Clean temporary files
+	@echo "🧹 Cleaning temporary files..."
+	@find . -type f -name "*.pyc" -delete
+	@find . -type d -name "__pycache__" -delete
+	@find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
+	@rm -rf .pytest_cache .coverage htmlcov .mypy_cache
+	@rm -rf $(CACHE_DIR)/* $(LOGS_DIR)/*
+	@echo "✅ Clean complete!"
+
+.PHONY: reset
+reset: ## Utility - Reset all data (⚠️ DESTRUCTIVE)
+	@echo "⚠️  WARNING: This will delete all data!"
+	@echo "Press Enter to continue or Ctrl+C to cancel..."
+	@read dummy
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) down -v
+	@rm -rf $(DATA_DIR)/faiss $(DATA_DIR)/neo4j $(DATA_DIR)/staging.db
+	@rm -rf $(CACHE_DIR)/* $(LOGS_DIR)/*
+	@echo "🔄 Reset complete!"
+
+.PHONY: backup
+backup: ## Utility - Create data backup
+	@echo "💾 Creating backup..."
+	@mkdir -p backups
+	@tar -czf backups/backup_$(shell date +%Y%m%d_%H%M%S).tar.gz $(DATA_DIR)/ $(CONFIG_DIR)/
+	@echo "✅ Backup created in backups/"
+
+.PHONY: env-check
+env-check: ## Utility - Check environment setup
+	@echo "🔍 Environment Check:"
+	@echo "Python: $(shell $(PYTHON) --version 2>/dev/null || echo 'Not found')"
+	@echo "Docker: $(shell $(DOCKER) --version 2>/dev/null || echo 'Not found')"
+	@echo "Docker Compose: $(shell $(DOCKER_COMPOSE) --version 2>/dev/null || echo 'Not found')"
+	@echo "Virtual Environment: $(shell [ -d $(VENV) ] && echo 'Present' || echo 'Missing')"
+
+# ============================================================================
+# Production Deployment
+# ============================================================================
+
+.PHONY: deploy-prod
+deploy-prod: ## Production - Deploy to production
+	@echo "🚀 Deploying to production..."
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_PROD_FILE) up -d --build
+	@echo "✅ Production deployment complete!"
+
+.PHONY: deploy-stop
+deploy-stop: ## Production - Stop production deployment
+	@echo "🛑 Stopping production deployment..."
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_PROD_FILE) down
+
+# ============================================================================
+# Development Workflow Shortcuts
+# ============================================================================
+
+.PHONY: dev
+dev: setup-dev neo4j-start migrate-schema serve ## Workflow - Complete development setup and start
+
+.PHONY: quick-start
+quick-start: docker-start ## Workflow - Quick start with Docker
+
+.PHONY: full-test
+full-test: quality test test-integration ## Workflow - Run all tests and quality checks
+
+# ============================================================================
+# Maintenance Commands
+# ============================================================================
+
+.PHONY: update-deps
+update-deps: ## Maintenance - Update Python dependencies
+	@echo "📦 Updating dependencies..."
+	@$(VENV_PIP) install --upgrade pip setuptools wheel
+	@$(VENV_PIP) install --upgrade -r requirements-dev.txt
+
+.PHONY: rebuild-index
+rebuild-index: ## Maintenance - Rebuild FAISS index
+	@echo "🔄 Rebuilding FAISS index..."
+	@$(VENV_PYTHON) scripts/merge_faiss.py
+
+# ============================================================================
+# Special Targets
+# ============================================================================
+
+# Ensure directories exist
+$(DATA_DIR) $(CACHE_DIR) $(LOGS_DIR):
+	@mkdir -p $@
+
+# Clean up on exit
+.PHONY: cleanup
+cleanup:
+	@echo "🧹 Performing cleanup..."
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) down 2>/dev/null || true

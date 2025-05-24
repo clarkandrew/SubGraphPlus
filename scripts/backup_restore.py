@@ -3,15 +3,10 @@ import os
 import datetime
 import shutil
 import subprocess
-import sys
 import logging
 import json
 import time
 from pathlib import Path
-
-# Add parent directory to path so we can import app modules
-parent_dir = str(Path(__file__).parent.parent)
-sys.path.append(parent_dir)
 
 from app.config import DB_CONFIG
 from app.database import sqlite_db
@@ -24,6 +19,7 @@ logging.basicConfig(
 logger = logging.getLogger("backup_restore")
 
 # Constants
+parent_dir = str(Path(__file__).parent.parent)
 BACKUP_DIR = os.path.join(parent_dir, "backups")
 NEO4J_CONTAINER = "subgraphrag_neo4j"
 NEO4J_BACKUP_CMD = "neo4j-admin dump"

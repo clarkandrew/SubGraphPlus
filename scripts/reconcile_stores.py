@@ -1,14 +1,10 @@
 import os
-import sys
 import time
 import logging
 import numpy as np
 import faiss
 from pathlib import Path
 from tqdm import tqdm
-
-# Add parent directory to path so script can import app modules
-sys.path.append(str(Path(__file__).parent.parent))
 
 from app.config import config
 from app.database import neo4j_db

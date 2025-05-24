@@ -17,7 +17,7 @@ from app.models import Triple, Entity, GraphNode, GraphLink
 @pytest.fixture
 def mock_neo4j():
     """Mock Neo4j database connection for testing"""
-    with patch('app.database.neo4j_db') as mock:
+    with patch('app.api.neo4j_db') as mock:
         # Configure mock behavior
         mock.run_query.return_value = []
         mock.verify_connectivity.return_value = True
@@ -27,7 +27,7 @@ def mock_neo4j():
 @pytest.fixture
 def mock_sqlite():
     """Mock SQLite database connection for testing"""
-    with patch('app.database.sqlite_db') as mock:
+    with patch('app.api.sqlite_db') as mock:
         # Configure mock behavior
         mock.verify_connectivity.return_value = True
         mock.execute.return_value = Mock()
@@ -55,7 +55,7 @@ def mock_config():
 @pytest.fixture
 def mock_faiss_index():
     """Mock FAISS index for testing"""
-    with patch('app.retriever.faiss_index') as mock:
+    with patch('app.api.faiss_index') as mock:
         # Configure mock behavior
         mock.search.return_value = []
         mock.get_vector.return_value = None

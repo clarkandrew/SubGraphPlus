@@ -4,11 +4,10 @@ import time
 import sqlite3
 import numpy as np
 import uuid
-from pathlib import Path
 import sys
+from pathlib import Path
+import argparse
 
-# Add parent directory to path so we can import app modules
-sys.path.append(str(Path(__file__).parent.parent))
 from app.database import sqlite_db, neo4j_db
 from app.ml.embedder import embed_text
 
@@ -240,28 +239,47 @@ def write_to_dead_letter_queue(error_ids):
 
 def main():
     """Main worker function"""
+    global BATCH_SIZE
+    
+    parser = argparse.ArgumentParser(description="Process pending triples from staging to Neo4j and FAISS")
+    parser.add_argument("--process-all", action="store_true", help="Process all pending triples")
+    parser.add_argument("--batch-size", type=int, default=BATCH_SIZE, help=f"Batch size for processing (default: {BATCH_SIZE})")
+    parser.add_argument("--max-batches", type=int, help="Maximum number of batches to process")
+    
+    args = parser.parse_args()
+    
+    # Update batch size if specified
+    BATCH_SIZE = args.batch_size
+    
     logger.info("Starting ingest worker")
     
     try:
         # Process batches until there are no more pending triples
         total_processed = 0
+        batch_count = 0
         
         while True:
             start_time = time.time()
             processed = process_batch()
             elapsed = time.time() - start_time
+            batch_count += 1
             
             if processed == 0:
                 # No more triples to process
                 break
                 
             total_processed += processed
-            logger.info(f"Processed batch of {processed} triples in {elapsed:.2f} seconds")
+            logger.info(f"Processed batch {batch_count} of {processed} triples in {elapsed:.2f} seconds")
+            
+            # Check if we've reached max batches
+            if args.max_batches and batch_count >= args.max_batches:
+                logger.info(f"Reached maximum batch limit of {args.max_batches}")
+                break
             
             # Short delay between batches
             time.sleep(0.5)
         
-        logger.info(f"Ingest worker completed, processed {total_processed} triples")
+        logger.info(f"Ingest worker completed, processed {total_processed} triples in {batch_count} batches")
     
     except Exception as e:
         logger.exception(f"Ingest worker failed: {str(e)}")

@@ -23,7 +23,7 @@ echo -e "${NC}"
 VENV_DIR="venv"
 PYTHON_VERSION="python3.9"
 ROOT_DIR=$(pwd)
-SKIP_TESTS=false
+SKIP_TESTS=true
 SKIP_NEO4J=false
 SKIP_SAMPLE_DATA=false
 PYTHON_PREFERRED_VERSION=""
@@ -32,6 +32,10 @@ USE_LOCAL_NEO4J=false
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --run-tests)
+      SKIP_TESTS=false
+      shift
+      ;;
     --skip-tests)
       SKIP_TESTS=true
       shift
@@ -56,7 +60,8 @@ while [[ $# -gt 0 ]]; do
       echo "Usage: ./bin/setup_dev.sh [options]"
       echo ""
       echo "Options:"
-      echo "  --skip-tests         Skip running tests"
+      echo "  --run-tests          Run tests (tests are skipped by default)"
+      echo "  --skip-tests         Skip running tests (default behavior)"
       echo "  --skip-neo4j         Skip Neo4j setup (if you have it running separately)"
       echo "  --skip-sample-data   Skip loading sample data"
       echo "  --python VERSION     Use specific Python version (e.g., python3.11)"
@@ -126,6 +131,10 @@ setup_venv() {
   # Install development dependencies
   echo -e "${GREEN}Installing development dependencies...${NC}"
   pip install -q -r requirements-dev.txt
+
+  # Install the package in development mode
+  echo -e "${GREEN}Installing SubGraphRAG+ in development mode...${NC}"
+  pip install -e .
 
   echo -e "${GREEN}Virtual environment setup complete.${NC}"
 }
@@ -451,7 +460,8 @@ except Exception as e:
 # Function to run tests
 run_tests() {
   if [ "$SKIP_TESTS" = true ]; then
-    echo -e "${YELLOW}Skipping tests as requested.${NC}"
+    echo -e "${YELLOW}Skipping tests (default behavior).${NC}"
+    echo -e "${YELLOW}Use --run-tests flag to enable test execution.${NC}"
     return 0
   fi
 

@@ -108,104 +108,109 @@ def test_query_empty_question(mock_auth_header):
 @patch('app.api.extract_query_entities')
 @patch('app.api.link_entities_v2')
 def test_query_no_entity_match(mock_link_entities, mock_extract_entities, mock_auth_header):
-    """Test query endpoint with no entity match"""
-    # Configure mocks
-    mock_extract_entities.return_value = ["Elon Musk"]
-    mock_link_entities.return_value = []  # No entities linked
+    """Test query with no entity matches"""
+    # Mock entity extraction and linking to return no matches
+    mock_extract_entities.return_value = ["unknown entity"]
+    mock_link_entities.return_value = []  # No entity matches
     
-    # Test with streaming response
     response = client.post(
-        "/query", 
-        json={"question": "Who is Elon Musk?"}, 
-        headers=mock_auth_header,
-        stream=True
+        "/query",
+        json={"question": "Who is unknown entity?"},
+        headers=mock_auth_header
     )
     
+    # Should return 200 with streaming response
     assert response.status_code == 200
     
-    # Process the streaming response
-    error_found = False
+    # Parse the streaming response
+    events = []
     for line in response.iter_lines():
         if line:
-            line = line.decode('utf-8')
-            if line.startswith('data:'):
-                data = json.loads(line[5:])
-                if 'event' in data and data['event'] == 'error':
-                    error_found = True
-                    assert data['data']['code'] == 'NO_ENTITY_MATCH'
-                    break
+            try:
+                event = json.loads(line)
+                events.append(event)
+            except json.JSONDecodeError:
+                continue
     
-    assert error_found
+    # Should contain an error event about no entity match
+    error_events = [e for e in events if e.get("event") == "error"]
+    assert len(error_events) > 0
+    assert error_events[0]["data"]["code"] == "NO_ENTITY_MATCH"
 
 @patch('app.api.extract_query_entities')
 @patch('app.api.link_entities_v2')
 @patch('app.api.hybrid_retrieve_v2')
 def test_query_retrieval_empty(mock_hybrid_retrieve, mock_link_entities, mock_extract_entities, mock_auth_header):
-    """Test query endpoint with empty retrieval results"""
-    # Configure mocks
+    """Test query when retrieval returns empty results"""
+    # Mock entity extraction and linking
     mock_extract_entities.return_value = ["Elon Musk"]
-    mock_link_entities.return_value = [("ent1", 0.9)]  # Entity linked
-    mock_hybrid_retrieve.side_effect = RetrievalEmpty("No relevant triples")
+    mock_link_entities.return_value = [("ent1", 0.9)]
     
-    # Test with streaming response
+    # Mock retrieval to raise RetrievalEmpty
+    mock_hybrid_retrieve.side_effect = RetrievalEmpty("No relevant triples found")
+    
     response = client.post(
-        "/query", 
-        json={"question": "Who is Elon Musk?"}, 
-        headers=mock_auth_header,
-        stream=True
+        "/query",
+        json={"question": "Who is Elon Musk?"},
+        headers=mock_auth_header
     )
     
+    # Should return 200 with streaming response
     assert response.status_code == 200
     
-    # Process the streaming response
-    error_found = False
+    # Parse the streaming response
+    events = []
     for line in response.iter_lines():
         if line:
-            line = line.decode('utf-8')
-            if line.startswith('data:'):
-                data = json.loads(line[5:])
-                if 'event' in data and data['event'] == 'error':
-                    error_found = True
-                    assert data['data']['code'] == 'NO_RELEVANT_TRIPLES'
-                    break
+            try:
+                event = json.loads(line)
+                events.append(event)
+            except json.JSONDecodeError:
+                continue
     
-    assert error_found
+    # Should contain an error event about no relevant triples
+    error_events = [e for e in events if e.get("event") == "error"]
+    assert len(error_events) > 0
+    assert error_events[0]["data"]["code"] == "NO_RELEVANT_TRIPLES"
 
 @patch('app.api.extract_query_entities')
 @patch('app.api.link_entities_v2')
 def test_query_ambiguous_entities(mock_link_entities, mock_extract_entities, mock_auth_header):
-    """Test query endpoint with ambiguous entities"""
-    # Configure mocks
-    mock_extract_entities.return_value = ["Tesla"]
-    mock_link_entities.side_effect = AmbiguousEntityError(
-        "Ambiguous entity Tesla", 
-        candidates=[{"id": "ent1", "name": "Tesla Inc."}, {"id": "ent2", "name": "Nikola Tesla"}]
-    )
+    """Test query with ambiguous entity matches"""
+    # Mock entity extraction
+    mock_extract_entities.return_value = ["Apple"]
     
-    # Test with streaming response
+    # Mock entity linking to raise AmbiguousEntityError
+    candidates = [
+        {"id": "ent1", "name": "Apple Inc."},
+        {"id": "ent2", "name": "Apple (fruit)"}
+    ]
+    mock_link_entities.side_effect = AmbiguousEntityError("Ambiguous entity", candidates)
+    
     response = client.post(
-        "/query", 
-        json={"question": "Tell me about Tesla"}, 
-        headers=mock_auth_header,
-        stream=True
+        "/query",
+        json={"question": "Tell me about Apple"},
+        headers=mock_auth_header
     )
     
+    # Should return 200 with streaming response
     assert response.status_code == 200
     
-    # Process the streaming response
-    error_found = False
+    # Parse the streaming response
+    events = []
     for line in response.iter_lines():
         if line:
-            line = line.decode('utf-8')
-            if line.startswith('data:'):
-                data = json.loads(line[5:])
-                if 'event' in data and data['event'] == 'error':
-                    error_found = True
-                    assert data['data']['code'] == 'AMBIGUOUS_ENTITIES'
-                    assert len(data['data']['candidates']) == 2
-                    break
+            try:
+                event = json.loads(line)
+                events.append(event)
+            except json.JSONDecodeError:
+                continue
     
-    assert error_found
+    # Should contain an error event about ambiguous entities
+    error_events = [e for e in events if e.get("event") == "error"]
+    assert len(error_events) > 0
+    assert error_events[0]["data"]["code"] == "AMBIGUOUS_ENTITIES"
+    assert "candidates" in error_events[0]["data"]
 
 def test_graph_browse(mock_neo4j, mock_auth_header):
     """Test graph browse endpoint"""

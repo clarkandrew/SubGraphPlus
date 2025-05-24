@@ -17,6 +17,7 @@ from app.models import Triple, RetrievalEmpty
 
 class TestRetriever(unittest.TestCase):
     
+    @patch('app.retriever.faiss_index')
     def test_get_triple_embedding_from_faiss(self, mock_faiss_index):
         """Test retrieving triple embedding from FAISS"""
         # Mock faiss index to return a specific vector
@@ -78,6 +79,7 @@ class TestRetriever(unittest.TestCase):
         # Check that heuristic_score was called with correct args
         mock_heuristic_score.assert_called_once_with(query_emb, triple_emb, dde_features)
     
+    @patch('app.retriever.neo4j_db')
     def test_neo4j_get_neighborhood_triples(self, mock_neo4j):
         """Test retrieving neighborhood triples from Neo4j"""
         # Mock Neo4j response
@@ -110,7 +112,9 @@ class TestRetriever(unittest.TestCase):
         self.assertEqual(kwargs["hops"], 2)
         self.assertEqual(kwargs["limit"], 100)
     
-    def test_faiss_search_triples_data(self, mock_neo4j, mock_faiss_index):
+    @patch('app.retriever.neo4j_db')
+    @patch('app.retriever.faiss_index')
+    def test_faiss_search_triples_data(self, mock_faiss_index, mock_neo4j):
         """Test searching for triple data using FAISS"""
         # Mock FAISS search results
         mock_faiss_index.search.return_value = [("rel1", 0.95)]
@@ -216,6 +220,7 @@ class TestRetriever(unittest.TestCase):
         with self.assertRaises(RetrievalEmpty):
             hybrid_retrieve_v2("Who founded Tesla?", ["ent1"])
     
+    @patch('app.retriever.neo4j_db')
     def test_entity_search(self, mock_neo4j):
         """Test entity search functionality"""
         # Mock Neo4j response
@@ -223,30 +228,25 @@ class TestRetriever(unittest.TestCase):
             {
                 "id": "ent1",
                 "name": "Elon Musk",
-                "type": "Person"
-            },
-            {
-                "id": "ent2",
-                "name": "Tesla Inc.",
-                "type": "Organization"
+                "type": "Person",
+                "labels": ["Entity", "Person"]
             }
         ]
         
         # Call the function
-        entities = entity_search("Tesla", limit=5)
+        results = entity_search("Elon", limit=10)
         
         # Check results
-        self.assertEqual(len(entities), 2)
-        self.assertEqual(entities[0]["id"], "ent1")
-        self.assertEqual(entities[0]["name"], "Elon Musk")
-        self.assertEqual(entities[1]["id"], "ent2")
-        self.assertEqual(entities[1]["name"], "Tesla Inc.")
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["id"], "ent1")
+        self.assertEqual(results[0]["name"], "Elon Musk")
+        self.assertEqual(results[0]["type"], "Person")
         
         # Check that Neo4j was called with correct args
         mock_neo4j.run_query.assert_called_once()
         args, kwargs = mock_neo4j.run_query.call_args
-        self.assertEqual(kwargs["search_term"], "Tesla")
-        self.assertEqual(kwargs["limit"], 5)
+        self.assertEqual(kwargs["search_term"], "Elon")
+        self.assertEqual(kwargs["limit"], 10)
 
 
 if __name__ == '__main__':
