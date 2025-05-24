@@ -49,29 +49,65 @@ def apply_migration(driver, file_path, version):
         with open(file_path, 'r') as file:
             cypher_script = file.read()
         
-        # Execute the Cypher script in a transaction
-        with driver.session() as session:
-            tx = session.begin_transaction()
-            
-            try:
-                # Run the migration script
-                tx.run(cypher_script)
+        # Split the script into individual statements
+        statements = parse_cypher_statements(cypher_script)
+        
+        # Separate schema and data statements
+        schema_statements = []
+        data_statements = []
+        
+        for statement in statements:
+            statement_upper = statement.strip().upper()
+            if (statement_upper.startswith('CREATE CONSTRAINT') or 
+                statement_upper.startswith('CREATE INDEX') or
+                statement_upper.startswith('DROP CONSTRAINT') or
+                statement_upper.startswith('DROP INDEX') or
+                statement_upper.startswith('CALL DB.INDEX')):
+                schema_statements.append(statement)
+            else:
+                data_statements.append(statement)
+        
+        # Execute schema modifications first (each in its own transaction)
+        for i, statement in enumerate(schema_statements):
+            if statement.strip():
+                logger.debug(f"Executing schema statement {i+1}: {statement[:100]}...")
+                with driver.session() as session:
+                    session.run(statement)
+        
+        # Execute data modifications in a single transaction
+        if data_statements:
+            with driver.session() as session:
+                tx = session.begin_transaction()
                 
-                # Record the migration version
-                tx.run("""
+                try:
+                    for i, statement in enumerate(data_statements):
+                        if statement.strip():
+                            logger.debug(f"Executing data statement {i+1}: {statement[:100]}...")
+                            tx.run(statement)
+                    
+                    # Record the migration version
+                    tx.run("""
+                    MERGE (s:_SchemaVersion {version: $version})
+                    SET s.appliedAt = timestamp()
+                    """, version=version)
+                    
+                    # Commit the transaction
+                    tx.commit()
+                    
+                except Exception as e:
+                    tx.rollback()
+                    logger.error(f"Migration {version} failed: {str(e)}")
+                    raise
+        else:
+            # If no data statements, just record the migration version
+            with driver.session() as session:
+                session.run("""
                 MERGE (s:_SchemaVersion {version: $version})
                 SET s.appliedAt = timestamp()
                 """, version=version)
-                
-                # Commit the transaction
-                tx.commit()
-                logger.info(f"Migration {version} applied successfully")
-                return True
-                
-            except Exception as e:
-                tx.rollback()
-                logger.error(f"Migration {version} failed: {str(e)}")
-                raise
+        
+        logger.info(f"Migration {version} applied successfully")
+        return True
                 
     except FileNotFoundError:
         logger.error(f"Migration file not found: {file_path}")
@@ -79,6 +115,37 @@ def apply_migration(driver, file_path, version):
     except Exception as e:
         logger.error(f"Unexpected error reading/parsing migration file: {str(e)}")
         return False
+
+def parse_cypher_statements(cypher_script):
+    """
+    Parse a Cypher script into individual statements
+    
+    This function splits a multi-statement Cypher script into individual
+    statements that can be executed separately.
+    
+    Args:
+        cypher_script: String containing the full Cypher script
+        
+    Returns:
+        List of individual Cypher statements
+    """
+    # Remove comments and split by semicolons
+    lines = []
+    for line in cypher_script.split('\n'):
+        line = line.strip()
+        # Skip comment lines
+        if line.startswith('//') or not line:
+            continue
+        # Remove inline comments
+        if '//' in line:
+            line = line[:line.index('//')]
+        lines.append(line)
+    
+    # Join lines and split by semicolons
+    clean_script = ' '.join(lines)
+    statements = [stmt.strip() for stmt in clean_script.split(';') if stmt.strip()]
+    
+    return statements
 
 def discover_migrations(migrations_dir):
     """Discover migration files in the migrations directory"""

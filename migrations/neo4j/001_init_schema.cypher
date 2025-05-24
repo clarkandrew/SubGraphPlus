@@ -2,27 +2,17 @@
 // Creates basic Entity and REL structure with constraints and indexes
 
 // Create constraints on Entity
-CREATE CONSTRAINT entity_id_unique IF NOT EXISTS 
-ON (e:Entity) 
-ASSERT e.id IS UNIQUE;
+CREATE CONSTRAINT ON (e:Entity) ASSERT e.id IS UNIQUE;
 
 // Set up indexes for better performance
-CREATE INDEX entity_name_idx IF NOT EXISTS
-FOR (e:Entity)
-ON (e.name);
+CREATE INDEX ON :Entity(name);
 
-CREATE INDEX entity_type_idx IF NOT EXISTS
-FOR (e:Entity)
-ON (e.type);
+CREATE INDEX ON :Entity(type);
 
 // Create index on relationships
-CREATE INDEX relation_name_idx IF NOT EXISTS
-FOR ()-[r:REL]->()
-ON (r.name);
+CREATE INDEX ON :REL(name);
 
-CREATE INDEX relation_id_idx IF NOT EXISTS
-FOR ()-[r:REL]->()
-ON (r.id);
+CREATE INDEX ON :REL(id);
 
 // Create basic schema info node
 MERGE (s:_SchemaVersion {version: "kg_v1"})

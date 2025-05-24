@@ -405,6 +405,158 @@ For production deployment, see the [Deployment Guide](docs/deployment.md) which 
 - Performance optimization
 - Backup and recovery procedures
 
+## 🔧 Troubleshooting
+
+### Common Setup Issues
+
+#### 1. Docker Daemon Not Running
+
+**Error**: "Cannot connect to the Docker daemon at unix:///var/run/docker.sock"
+
+**Solutions**:
+```bash
+# macOS: Start Docker Desktop
+open -a Docker
+# OR use our helper script
+./bin/start_docker.sh
+
+# Linux: Start Docker service
+sudo systemctl start docker
+sudo systemctl enable docker
+
+# Verify Docker is running
+docker info
+```
+
+#### 2. Docker Compose Configuration Missing
+
+**Error**: "no configuration file provided: not found"
+
+**Solution**: The project includes a docker-compose.yml file in the root for development
+```bash
+# Verify file exists
+ls -la docker-compose.yml
+
+# If missing, the setup script should have created it
+# If not, run setup again:
+./bin/setup_dev.sh
+```
+
+#### 3. Neo4j Connection Issues
+
+**Error**: Neo4j connection failed or container won't start
+
+**Solutions**:
+```bash
+# Check container status
+docker ps -a
+docker logs subgraphrag_neo4j
+
+# Reset Neo4j container
+docker-compose down
+docker volume rm $(docker volume ls -q | grep neo4j)
+docker-compose up -d neo4j
+
+# Alternative: Use local Neo4j installation
+./bin/setup_dev.sh --use-local-neo4j
+
+# Alternative: Skip Neo4j for initial testing
+./bin/setup_dev.sh --skip-neo4j
+```
+
+#### 4. Port Conflicts
+
+**Error**: "Port 7474/7687 is already allocated"
+
+**Solutions**:
+```bash
+# Check what's using the ports
+lsof -i :7474
+lsof -i :7687
+
+# Stop conflicting Neo4j services
+brew services stop neo4j    # macOS
+sudo systemctl stop neo4j   # Linux
+
+# Or modify ports in docker-compose.yml
+```
+
+#### 5. Python Environment Issues
+
+**Error**: Module not found or Python version incompatible
+
+**Solutions**:
+```bash
+# Verify Python version (3.9+ required)
+python --version
+
+# Recreate virtual environment
+rm -rf venv
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements-dev.txt
+
+# Use specific Python version
+./bin/setup_dev.sh --python python3.11
+```
+
+#### 6. Permission Issues (Linux)
+
+**Error**: Permission denied accessing Docker or files
+
+**Solutions**:
+```bash
+# Add user to docker group
+sudo usermod -aG docker $USER
+newgrp docker
+
+# Fix file permissions
+sudo chown -R $USER:$USER .
+chmod +x bin/*.sh
+```
+
+### Advanced Troubleshooting
+
+#### Clean Reset
+If all else fails, perform a complete reset:
+```bash
+# Stop and remove everything
+docker-compose down -v
+docker system prune -a
+
+# Remove virtual environment
+rm -rf venv
+
+# Clean data directories
+rm -rf data/faiss data/neo4j cache logs
+
+# Start fresh
+./bin/setup_dev.sh
+```
+
+#### Debugging Mode
+Enable detailed logging for diagnosis:
+```bash
+# Set debug environment
+export DEBUG=true
+export LOG_LEVEL=DEBUG
+
+# Run with verbose output
+./bin/setup_dev.sh --verbose
+
+# Check logs
+tail -f logs/app.log
+```
+
+#### Getting Help
+- Check the [Development Guide](docs/development.md) for detailed troubleshooting
+- Search [GitHub Issues](https://github.com/clarkandrew/SubgraphRAGPlus/issues) for similar problems
+- Create a new issue with:
+  - Your operating system and version
+  - Docker version (`docker --version`)
+  - Error messages and logs
+  - Steps to reproduce
+
 ## 🤝 Contributing
 
 We welcome contributions! Please see our [Development Guide](docs/development.md) for:

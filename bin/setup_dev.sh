@@ -121,11 +121,11 @@ setup_venv() {
 
   # Upgrade pip, setuptools, and wheel
   echo -e "${GREEN}Upgrading pip, setuptools, and wheel...${NC}"
-  pip install --upgrade pip setuptools wheel
+  pip install -q --upgrade pip setuptools wheel
 
   # Install development dependencies
   echo -e "${GREEN}Installing development dependencies...${NC}"
-  pip install -r requirements-dev.txt
+  pip install -q -r requirements-dev.txt
 
   echo -e "${GREEN}Virtual environment setup complete.${NC}"
 }
@@ -184,6 +184,29 @@ setup_neo4j() {
       exit 1
     fi
 
+    # Check if Docker daemon is running
+    if ! docker info >/dev/null 2>&1; then
+      echo -e "${RED}Docker daemon is not running.${NC}"
+      echo -e "${YELLOW}Please start Docker and try again. You can:${NC}"
+      echo -e "1. Start Docker Desktop application"
+      echo -e "2. Or run: ${BLUE}sudo systemctl start docker${NC} (Linux)"
+      echo -e "3. Or run: ${BLUE}open -a Docker${NC} (macOS)"
+      echo -e ""
+      echo -e "${YELLOW}Alternative options:${NC}"
+      echo -e "• Use --skip-neo4j flag to skip Neo4j setup"
+      echo -e "• Use --use-local-neo4j if you have Neo4j installed locally"
+      echo -e ""
+      echo -e "${YELLOW}Would you like to continue without Docker? [y/N]${NC}"
+      read -r response
+      if [[ "$response" =~ ^[Yy]$ ]]; then
+        echo -e "${YELLOW}Continuing without Docker. Please ensure Neo4j is available separately.${NC}"
+        SKIP_NEO4J=true
+        return 0
+      else
+        exit 1
+      fi
+    fi
+
     # Check if docker-compose is installed
     if ! command -v docker-compose >/dev/null 2>&1 && ! docker compose version >/dev/null 2>&1; then
       echo -e "${RED}Docker Compose is not installed. Please install Docker Compose and try again.${NC}"
@@ -196,15 +219,31 @@ setup_neo4j() {
       echo -e "${YELLOW}Neo4j container is already running.${NC}"
     else
       echo -e "${GREEN}Starting Neo4j container...${NC}"
+      
+      # Try to start using docker compose (newer format first)
       if docker compose version >/dev/null 2>&1; then
-        docker compose up -d neo4j
+        if ! docker compose up -d neo4j 2>/dev/null; then
+          echo -e "${RED}Failed to start Neo4j with 'docker compose'.${NC}"
+          echo -e "${YELLOW}Trying with 'docker-compose'...${NC}"
+          docker-compose up -d neo4j
+        fi
       else
         docker-compose up -d neo4j
       fi
 
       # Wait for Neo4j to start
       echo -e "${YELLOW}Waiting for Neo4j to start (this may take a minute)...${NC}"
-      sleep 10
+      sleep 15
+      
+      # Check if container started successfully
+      if ! docker ps | grep -q "subgraphrag_neo4j"; then
+        echo -e "${RED}Failed to start Neo4j container. Please check Docker logs:${NC}"
+        echo -e "${BLUE}docker logs subgraphrag_neo4j${NC}"
+        echo -e "${YELLOW}You can continue with --skip-neo4j flag or --use-local-neo4j if you have Neo4j installed locally.${NC}"
+        exit 1
+      else
+        echo -e "${GREEN}Neo4j container started successfully.${NC}"
+      fi
     fi
   fi
 
