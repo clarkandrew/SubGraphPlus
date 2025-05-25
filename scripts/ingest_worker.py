@@ -253,6 +253,19 @@ def main():
     
     logger.info("Starting ingest worker")
     
+    # Test embedder initialization early to catch model loading issues
+    try:
+        logger.info("Initializing embedder (this may take time on first run to download models)...")
+        test_embedding = embed_text("test")
+        if test_embedding is None or len(test_embedding) == 0:
+            logger.error("Embedder test failed - got empty result")
+            return 1
+        logger.info(f"Embedder initialized successfully, embedding dimension: {len(test_embedding)}")
+    except Exception as e:
+        logger.error(f"Failed to initialize embedder: {str(e)}")
+        logger.error("Cannot proceed without working embedder")
+        return 1
+    
     try:
         # Process batches until there are no more pending triples
         total_processed = 0
@@ -266,6 +279,7 @@ def main():
             
             if processed == 0:
                 # No more triples to process
+                logger.info("No more pending triples to process")
                 break
                 
             total_processed += processed
@@ -279,12 +293,16 @@ def main():
             # Short delay between batches
             time.sleep(0.5)
         
-        logger.info(f"Ingest worker completed, processed {total_processed} triples in {batch_count} batches")
+        logger.info(f"Ingest worker completed successfully, processed {total_processed} triples in {batch_count} batches")
     
+    except KeyboardInterrupt:
+        logger.info("Ingest worker interrupted by user")
+        return 1
     except Exception as e:
         logger.exception(f"Ingest worker failed: {str(e)}")
         return 1
     
+    logger.info("Ingest worker exiting normally")
     return 0
 
 if __name__ == "__main__":

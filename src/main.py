@@ -4,6 +4,10 @@ import uvicorn
 import argparse
 from pathlib import Path
 
+# Load environment variables from .env file before anything else
+from dotenv import load_dotenv
+load_dotenv()
+
 # Set up logging before importing app modules
 logging.basicConfig(
     level=logging.INFO,
@@ -93,3 +97,9 @@ if __name__ == "__main__":
     
     # Run application
     run_app(args.host, args.port, args.reload)
+
+# Setup environment for uvicorn direct usage
+setup_environment()
+
+# Import and expose the FastAPI app for uvicorn
+from src.app.api import app

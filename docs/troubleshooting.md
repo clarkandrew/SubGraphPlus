@@ -523,7 +523,7 @@ grep MLX .env
 # Test MLX configuration
 python -c "
 import os
-os.environ['USE_MLX'] = 'true'
+os.environ['USE_MLX_LLM'] = 'true'
 from app.ml.llm import LLMService
 from app.ml.embedder import EmbedderService
 
@@ -538,7 +538,7 @@ except Exception as e:
 "
 
 # Fallback to non-MLX mode
-echo "USE_MLX=false" >> .env
+echo "USE_MLX_LLM=false" >> .env
 echo "MODEL_BACKEND=openai" >> .env
 ```
 

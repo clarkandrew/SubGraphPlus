@@ -9,7 +9,7 @@ This document summarizes the comprehensive MLX integration added to SubgraphRAG+
 ### 1. Environment Configuration
 
 #### `.env.example` Updates
-- Added `USE_MLX` environment variable (default: `false`)
+- Added `USE_MLX_LLM` environment variable (default: `false`)
 - Added `MLX_LLM_MODEL` for specifying MLX LLM models
 - Added `MLX_LLM_MODEL_PATH` for local model paths
 - Added `MLX_EMBEDDING_MODEL` for MLX embedding models
@@ -24,7 +24,7 @@ This document summarizes the comprehensive MLX integration added to SubgraphRAG+
 
 #### `src/app/ml/embedder.py` Updates
 - Enhanced MLX availability detection
-- Added `USE_MLX` environment variable respect
+- Added `USE_MLX_LLM` environment variable respect
 - Improved error handling for MLX initialization
 - Added fallback mechanisms when MLX is unavailable
 - Enhanced logging for MLX operations
@@ -93,7 +93,7 @@ This document summarizes the comprehensive MLX integration added to SubgraphRAG+
 
 ### Environment Variables
 ```bash
-USE_MLX=true                    # Enable MLX
+USE_MLX_LLM=true                    # Enable MLX
 MODEL_BACKEND=mlx              # Set backend to MLX
 MLX_LLM_MODEL=model-name       # Specify LLM model
 MLX_EMBEDDING_MODEL=model-name # Specify embedding model
@@ -129,7 +129,7 @@ python -c "import mlx.core as mx; print(f'✅ MLX version: {mx.__version__}')"
 # Test MLX services
 python -c "
 import os
-os.environ['USE_MLX'] = 'true'
+os.environ['USE_MLX_LLM'] = 'true'
 from app.ml.llm import LLMService
 from app.ml.embedder import EmbedderService
 llm = LLMService()

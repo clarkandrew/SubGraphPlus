@@ -6,7 +6,7 @@
     "MODEL_BACKEND": {
       "type": "string",
       "enum": ["mlx", "openai", "hf"],
-      "description": "Model backend to use for LLM and embeddings"
+      "description": "Model backend to use for LLM generation"
     },
     "FAISS_INDEX_PATH": {
       "type": "string",

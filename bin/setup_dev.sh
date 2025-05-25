@@ -446,12 +446,32 @@ except Exception as e:
   mkdir -p data/faiss data/sample_data
 
   # Stage sample data
+  echo -e "${GREEN}Staging sample data...${NC}"
   python scripts/stage_ingest.py --sample
 
-  # Process ingestion queue
-  python scripts/ingest_worker.py --process-all
+  # Process ingestion queue with timeout
+  echo -e "${GREEN}Processing ingestion queue (this may take a few minutes on first run due to model download)...${NC}"
+  
+  # Add timeout to prevent hanging - 10 minutes should be enough for model download and processing
+  timeout 600 python scripts/ingest_worker.py --process-all
+  INGEST_EXIT_CODE=$?
+  
+  if [ $INGEST_EXIT_CODE -eq 124 ]; then
+    echo -e "${RED}Ingest worker timed out after 10 minutes.${NC}"
+    echo -e "${YELLOW}This might be due to slow model download. You can run the ingest manually later with:${NC}"
+    echo -e "${YELLOW}  source venv/bin/activate && python scripts/ingest_worker.py --process-all${NC}"
+    echo -e "${YELLOW}Continuing with setup...${NC}"
+  elif [ $INGEST_EXIT_CODE -ne 0 ]; then
+    echo -e "${RED}Ingest worker failed with exit code $INGEST_EXIT_CODE.${NC}"
+    echo -e "${YELLOW}You can run the ingest manually later with:${NC}"
+    echo -e "${YELLOW}  source venv/bin/activate && python scripts/ingest_worker.py --process-all${NC}"
+    echo -e "${YELLOW}Continuing with setup...${NC}"
+  else
+    echo -e "${GREEN}Ingest worker completed successfully.${NC}"
+  fi
 
   # Merge FAISS index
+  echo -e "${GREEN}Merging FAISS index...${NC}"
   python scripts/merge_faiss.py
 
   echo -e "${GREEN}Sample data loaded.${NC}"

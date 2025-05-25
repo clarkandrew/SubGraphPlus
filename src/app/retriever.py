@@ -66,10 +66,9 @@ class FaissIndex:
     def _create_empty_index(self):
         """Create an empty FAISS index"""
         logger.info("Creating empty FAISS index")
-        # Determine dimension based on model backend
-        dim = 1024  # gte-large-en-v1.5 dimension for HF and MLX
-        if config.MODEL_BACKEND == "openai":
-            dim = 1536
+        # Embeddings always use HuggingFace (1024 dim for gte-large-en-v1.5)
+        # regardless of MODEL_BACKEND which only affects LLM
+        dim = 1024
             
         # Create IVF index with PQ for efficient search
         quantizer = faiss.IndexFlatL2(dim)
@@ -175,11 +174,8 @@ def get_triple_embedding_from_faiss(triple_id: str) -> np.ndarray:
     """Get embedding for a triple from FAISS"""
     embedding = faiss_index.get_vector(triple_id)
     if embedding is None:
-        # Return zero vector with appropriate dimension
-        dim = 1024  # gte-large-en-v1.5 dimension for HF and MLX
-        if config.MODEL_BACKEND == "openai":
-            dim = 1536
-        embedding = np.zeros(dim, dtype=np.float32)
+        # Embeddings always use HuggingFace (1024 dim) regardless of MODEL_BACKEND
+        embedding = np.zeros(1024, dtype=np.float32)
     return embedding
 
 

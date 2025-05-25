@@ -4,6 +4,10 @@ import logging
 import jsonschema
 from pathlib import Path
 
+# Load environment variables from .env file before accessing them
+from dotenv import load_dotenv
+load_dotenv()
+
 # Set up logging
 logging.basicConfig(
     level=logging.INFO,
@@ -34,15 +38,12 @@ NEO4J_PASSWORD = os.environ.get("NEO4J_PASSWORD", "password")
 API_KEY_SECRET = os.environ.get("API_KEY_SECRET", "default_key_for_dev_only")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 
-# MLX Configuration
-USE_MLX = os.environ.get("USE_MLX", "false").lower() in ("true", "1", "yes", "on")
+# MLX Configuration (for LLM only when MODEL_BACKEND=mlx)
 MLX_LLM_MODEL = os.environ.get("MLX_LLM_MODEL", "mlx-community/Mistral-7B-Instruct-v0.2-4bit-mlx")
 MLX_LLM_MODEL_PATH = os.environ.get("MLX_LLM_MODEL_PATH")
-MLX_EMBEDDING_MODEL = os.environ.get("MLX_EMBEDDING_MODEL", "mlx-community/all-MiniLM-L6-v2-mlx")
-MLX_EMBEDDING_MODEL_PATH = os.environ.get("MLX_EMBEDDING_MODEL_PATH")
 
-# Standard embedding model for non-MLX backends
-EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
+# Embedding model (always uses HuggingFace transformers regardless of MODEL_BACKEND)
+EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "Alibaba-NLP/gte-large-en-v1.5")
 
 # Configuration class
 class Config:

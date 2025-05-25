@@ -243,7 +243,7 @@ python -c "import mlx.core as mx; print(f'✅ MLX installed: {mx.__version__}')"
 
 ```bash
 # Enable MLX in your .env file
-echo "USE_MLX=true" >> .env
+echo "USE_MLX_LLM=true" >> .env
 echo "MODEL_BACKEND=mlx" >> .env
 
 # Set MLX models (these will be downloaded automatically)
@@ -280,7 +280,7 @@ print('✅ Embedding model downloaded')
 # Test MLX functionality
 python -c "
 import os
-os.environ['USE_MLX'] = 'true'
+os.environ['USE_MLX_LLM'] = 'true'
 from app.ml.llm import LLMService
 from app.ml.embedder import EmbedderService
 

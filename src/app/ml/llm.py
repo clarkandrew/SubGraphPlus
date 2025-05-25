@@ -3,41 +3,38 @@ import os
 from typing import Dict, List, Optional, Any
 from functools import lru_cache
 
-from app.config import config, OPENAI_API_KEY, USE_MLX, MLX_LLM_MODEL, MLX_LLM_MODEL_PATH
+from app.config import config, OPENAI_API_KEY, MLX_LLM_MODEL, MLX_LLM_MODEL_PATH
 
 logger = logging.getLogger(__name__)
 
-# Check for MLX availability and user preference
+# Check for MLX availability (default backend)
 MLX_AVAILABLE = False
-if USE_MLX:
-    try:
-        import mlx.core as mx
-        import mlx.nn as nn
-        MLX_AVAILABLE = True
-        logger.info("MLX is available and enabled via USE_MLX=true for LLM")
-    except ImportError:
-        logger.warning("MLX requested via USE_MLX=true but MLX not available. Install with: pip install mlx")
-        logger.warning("Falling back to non-MLX LLM backends")
-else:
-    logger.info("MLX disabled via USE_MLX=false or not set for LLM")
+try:
+    import mlx.core as mx
+    import mlx.nn as nn
+    MLX_AVAILABLE = True
+    logger.info("MLX is available and will be used as the primary backend for LLM")
+except ImportError:
+    logger.warning("MLX not available. Install with: pip install mlx mlx-lm")
+    logger.warning("Falling back to HuggingFace/OpenAI backends")
 
-# Check for Hugging Face transformers
+# Check for Hugging Face transformers (fallback)
 HF_AVAILABLE = False
 try:
     import torch
     from transformers import pipeline, AutoTokenizer, AutoModelForCausalLM
     HF_AVAILABLE = True
-    logger.info("Hugging Face Transformers is available and will be used for HF models if selected")
+    logger.info("Hugging Face Transformers is available and will be used as fallback")
 except ImportError:
     logger.warning("Hugging Face Transformers not available, will not be able to use HF models")
 
-# Check for OpenAI
+# Check for OpenAI (fallback)
 OPENAI_AVAILABLE = False
 try:
     from openai import OpenAI
     if OPENAI_API_KEY:
         OPENAI_AVAILABLE = True
-        logger.info("OpenAI API is available and will be used if selected")
+        logger.info("OpenAI API is available and will be used as fallback")
     else:
         logger.warning("OpenAI API key not set, will not be able to use OpenAI models")
 except ImportError:
@@ -47,7 +44,7 @@ except ImportError:
 # Cache for LLM models
 @lru_cache(maxsize=1)
 def get_hf_model():
-    """Get or initialize the Hugging Face model"""
+    """Get or initialize the Hugging Face model (fallback)"""
     if not HF_AVAILABLE:
         raise ImportError("Hugging Face Transformers not available")
     
@@ -67,9 +64,9 @@ def get_hf_model():
 
 @lru_cache(maxsize=1)
 def get_mlx_model():
-    """Get or initialize the MLX LLM model"""
+    """Get or initialize the MLX LLM model (primary)"""
     if not MLX_AVAILABLE:
-        raise ImportError("MLX not available or not enabled. Set USE_MLX=true and install MLX.")
+        raise ImportError("MLX not available. Install with: pip install mlx mlx-lm")
     
     # Try to load MLX LLM model
     try:
@@ -88,16 +85,16 @@ def get_mlx_model():
 
 @lru_cache(maxsize=1)
 def get_openai_client():
-    """Get or initialize the OpenAI client"""
+    """Get or initialize the OpenAI client (fallback)"""
     if not OPENAI_AVAILABLE:
         raise ImportError("OpenAI not available")
     return OpenAI(api_key=OPENAI_API_KEY)
 
 
 def mlx_generate(prompt: str, **kwargs) -> str:
-    """Generate text using MLX"""
+    """Generate text using MLX (primary backend)"""
     if not MLX_AVAILABLE:
-        raise ImportError("MLX not available or not enabled. Set USE_MLX=true and install MLX.")
+        raise ImportError("MLX not available. Install with: pip install mlx mlx-lm")
     
     model, tokenizer = get_mlx_model()
     
@@ -136,11 +133,11 @@ def mlx_generate(prompt: str, **kwargs) -> str:
 
 
 def huggingface_generate(prompt: str, **kwargs) -> str:
-    """Generate text using Hugging Face model"""
+    """Generate text using Hugging Face model (fallback)"""
     if not HF_AVAILABLE:
         raise ImportError("Hugging Face Transformers not available")
     
-    logger.info(f"Generating with HF: prompt length={len(prompt)}")
+    logger.info(f"Generating with HF (fallback): prompt length={len(prompt)}")
     
     model, tokenizer = get_hf_model()
     
@@ -167,11 +164,11 @@ def huggingface_generate(prompt: str, **kwargs) -> str:
 
 
 def openai_generate(prompt: str, **kwargs) -> str:
-    """Generate text using OpenAI API"""
+    """Generate text using OpenAI API (fallback)"""
     if not OPENAI_AVAILABLE:
         raise ImportError("OpenAI not available")
     
-    logger.info(f"Generating with OpenAI: prompt length={len(prompt)}")
+    logger.info(f"Generating with OpenAI (fallback): prompt length={len(prompt)}")
     client = get_openai_client()
     
     # Extract parameters with defaults
@@ -197,7 +194,7 @@ def openai_generate(prompt: str, **kwargs) -> str:
 
 
 def generate_answer(prompt: str, **kwargs) -> str:
-    """Generate an answer from the LLM using the provided prompt."""
+    """Generate an answer from the LLM using the configured backend."""
     try:
         if config.MODEL_BACKEND == "mlx":
             return mlx_generate(prompt, **kwargs)
@@ -207,15 +204,32 @@ def generate_answer(prompt: str, **kwargs) -> str:
             return openai_generate(prompt, **kwargs)
         else:
             logger.error(f"Unknown model backend: {config.MODEL_BACKEND}")
-            # Default to OpenAI if available, then HF
-            if OPENAI_AVAILABLE:
-                return openai_generate(prompt, **kwargs)
+            # Default fallback order: MLX -> HF -> OpenAI
+            if MLX_AVAILABLE:
+                return mlx_generate(prompt, **kwargs)
             elif HF_AVAILABLE:
                 return huggingface_generate(prompt, **kwargs)
+            elif OPENAI_AVAILABLE:
+                return openai_generate(prompt, **kwargs)
             else:
                 return "Error: No available LLM backend."
     except Exception as e:
-        logger.error(f"Error generating answer: {e}")
+        logger.error(f"Error generating answer with {config.MODEL_BACKEND}: {e}")
+        # Try fallback backends
+        if config.MODEL_BACKEND != "openai" and OPENAI_AVAILABLE:
+            try:
+                logger.info("Falling back to OpenAI")
+                return openai_generate(prompt, **kwargs)
+            except Exception as fallback_e:
+                logger.error(f"OpenAI fallback failed: {fallback_e}")
+        
+        if config.MODEL_BACKEND != "hf" and HF_AVAILABLE:
+            try:
+                logger.info("Falling back to HuggingFace")
+                return huggingface_generate(prompt, **kwargs)
+            except Exception as fallback_e:
+                logger.error(f"HuggingFace fallback failed: {fallback_e}")
+        
         return f"Error generating answer: {str(e)}"
 
 

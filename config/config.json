@@ -1,5 +1,5 @@
 {
-  "MODEL_BACKEND": "hf",
+  "MODEL_BACKEND": "mlx",
   "FAISS_INDEX_PATH": "data/faiss_index.bin",
   "TOKEN_BUDGET": 4000,
   "MLP_MODEL_PATH": "models/mlp/mlp.pth",

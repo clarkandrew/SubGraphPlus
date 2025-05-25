@@ -88,7 +88,7 @@ Defines the JSON schema for validating the main configuration file.
 
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
-| `USE_MLX` | Enable MLX functionality | `false` | ❌ |
+| `USE_MLX_LLM` | Enable MLX functionality | `false` | ❌ |
 | `MLX_LLM_MODEL` | MLX LLM model identifier | `mlx-community/Mistral-7B-Instruct-v0.2-4bit-mlx` | ❌ |
 | `MLX_LLM_MODEL_PATH` | Local path to MLX LLM model | - | ❌ |
 | `MLX_EMBEDDING_MODEL` | MLX embedding model identifier | `mlx-community/all-MiniLM-L6-v2-mlx` | ❌ |
@@ -180,7 +180,7 @@ WORKERS=1
 ```bash
 # .env.mlx
 # Enable MLX for Apple Silicon Macs
-USE_MLX=true
+USE_MLX_LLM=true
 MODEL_BACKEND=mlx
 
 # MLX LLM Configuration
