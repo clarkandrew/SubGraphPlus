@@ -1,11 +1,23 @@
 import os
 import sqlite3
 import logging
-from neo4j import GraphDatabase
-from neo4j.exceptions import ServiceUnavailable
 from pathlib import Path
-from app.config import config, NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD
 import threading
+
+# Add testing check first
+TESTING = os.getenv('TESTING', '').lower() in ('1', 'true', 'yes')
+
+# Conditional imports for neo4j
+if not TESTING:
+    from neo4j import GraphDatabase
+    from neo4j.exceptions import ServiceUnavailable
+    from app.config import config, NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD
+else:
+    # Mock neo4j during testing
+    GraphDatabase = None
+    ServiceUnavailable = Exception
+    from app.config import config
+    NEO4J_URI = NEO4J_USER = NEO4J_PASSWORD = None
 
 logger = logging.getLogger(__name__)
 
@@ -18,10 +30,15 @@ class Neo4jDatabase:
     
     def __init__(self):
         self._driver = None
-        self._connect()
+        if not TESTING:
+            self._connect()
     
     def _connect(self):
         """Connect to Neo4j database"""
+        if TESTING or GraphDatabase is None:
+            logger.info("Skipping Neo4j connection in testing mode")
+            return
+            
         try:
             self._driver = GraphDatabase.driver(
                 NEO4J_URI,
@@ -37,7 +54,7 @@ class Neo4jDatabase:
     
     def verify_connectivity(self):
         """Test Neo4j connection"""
-        if not self._driver:
+        if TESTING or not self._driver:
             return False
         try:
             self._driver.verify_connectivity()
@@ -55,18 +72,24 @@ class Neo4jDatabase:
     
     def get_session(self):
         """Get a Neo4j session"""
+        if TESTING:
+            raise RuntimeError("Neo4j not available in testing mode")
         if not self._driver:
             self._connect()
         return self._driver.session()
     
     def run_query(self, query, params=None):
         """Run a Neo4j query"""
+        if TESTING:
+            return []
         with self.get_session() as session:
             result = session.run(query, params or {})
             return list(result)
     
     def run_transaction(self, tx_function, *args, **kwargs):
         """Run a transaction function"""
+        if TESTING:
+            return None
         with self.get_session() as session:
             return session.execute_write(tx_function, *args, **kwargs)
 
@@ -75,16 +98,22 @@ class SQLiteDatabase:
     """SQLite database connection manager"""
     
     def __init__(self):
-        self.db_path = SQLITE_DB_PATH
+        if TESTING:
+            # Use in-memory database for testing
+            self.db_path = ":memory:"
+        else:
+            self.db_path = SQLITE_DB_PATH
         self._connection = None
         self._lock = threading.Lock()
-        self._ensure_db_dir()
+        if not TESTING:
+            self._ensure_db_dir()
         self._connect()
         self._setup_schema()
     
     def _ensure_db_dir(self):
         """Ensure the database directory exists"""
-        Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
+        if not TESTING:
+            Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
     
     def _connect(self):
         """Connect to SQLite database"""
@@ -95,9 +124,10 @@ class SQLiteDatabase:
                 check_same_thread=False,
                 timeout=30.0
             )
-            # Enable WAL mode for better concurrency
-            self._connection.execute("PRAGMA journal_mode=WAL")
-            self._connection.execute("PRAGMA synchronous=NORMAL")
+            # Enable WAL mode for better concurrency (skip for in-memory)
+            if not TESTING:
+                self._connection.execute("PRAGMA journal_mode=WAL")
+                self._connection.execute("PRAGMA synchronous=NORMAL")
             logger.info(f"Connected to SQLite database at {self.db_path}")
         except sqlite3.Error as e:
             logger.error(f"Failed to connect to SQLite: {e}")
@@ -205,11 +235,18 @@ class SQLiteDatabase:
 
 
 # Create singleton instances
-neo4j_db = Neo4jDatabase()
-sqlite_db = SQLiteDatabase()
+# Skip database connections during testing to speed up tests and avoid connection errors
+if TESTING:
+    neo4j_db = None
+    sqlite_db = None
+else:
+    neo4j_db = Neo4jDatabase()
+    sqlite_db = SQLiteDatabase()
 
 
 def close_connections():
     """Close all database connections"""
-    neo4j_db.close()
-    sqlite_db.close()
+    if neo4j_db:
+        neo4j_db.close()
+    if sqlite_db:
+        sqlite_db.close()

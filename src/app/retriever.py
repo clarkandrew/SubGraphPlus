@@ -31,6 +31,8 @@ DENSE_CANDIDATES_K = 50   # Max candidates from dense stage before MLP scoring
 FINAL_GRAPH_TOP_K = 60    # Triples to select from graph-favored candidates after MLP
 FINAL_DENSE_TOP_K = 20    # Triples to select from dense-favored candidates after MLP
 
+# Add this check at the top after imports
+TESTING = os.getenv('TESTING', '').lower() in ('1', 'true', 'yes')
 
 class FaissIndex:
     """FAISS index manager for triple embeddings"""
@@ -166,8 +168,15 @@ class FaissIndex:
             return None
 
 
-# Singleton instance
-faiss_index = FaissIndex()
+# Load MLP model (or None if not available)
+# Skip loading during testing to prevent segfaults and speed up tests
+if TESTING:
+    mlp_model = None
+    faiss_index = None
+else:
+    mlp_model = load_pretrained_mlp()
+    # Singleton instance  
+    faiss_index = FaissIndex()
 
 
 def get_triple_embedding_from_faiss(triple_id: str) -> np.ndarray:
@@ -181,16 +190,17 @@ def get_triple_embedding_from_faiss(triple_id: str) -> np.ndarray:
 
 class SimpleMLP(nn.Module):
     """Simple MLP for SubgraphRAG scoring"""
-    def __init__(self, input_dim=4116, hidden_dim=1024, output_dim=1):  # 1024*4 + 20 DDE features = 4116
+    def __init__(self, input_dim=4116, hidden_dim=1024, output_dim=1):  # Matches actual pre-trained model
         super(SimpleMLP, self).__init__()
-        self.layers = nn.Sequential(
-            nn.Linear(input_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, output_dim)
+        # Architecture must match the saved model: pred.0 (input -> hidden), pred.2 (hidden -> output)
+        self.pred = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),    # pred.0
+            nn.ReLU(),                           # pred.1 (no parameters)
+            nn.Linear(hidden_dim, output_dim)    # pred.2
         )
     
     def forward(self, x):
-        return self.layers(x)
+        return self.pred(x)
 
 
 def calculate_mlp_input_dim(embeddings, dde_features):
@@ -211,31 +221,47 @@ def load_pretrained_mlp():
         if os.path.exists(mlp_path):
             logger.info(f"Loading pre-trained MLP from {mlp_path}")
             
-            # Try to load as state dict first (safer)
-            try:
-                state_dict = torch.load(mlp_path, map_location=torch.device('cpu'), weights_only=True)
-                model = SimpleMLP()
-                model.load_state_dict(state_dict)
+            # Load the model file (contains config and model_state_dict)
+            checkpoint = torch.load(mlp_path, map_location=torch.device('cpu'), weights_only=False)
+            
+            if isinstance(checkpoint, dict) and 'model_state_dict' in checkpoint:
+                # This is a checkpoint with model_state_dict
+                state_dict = checkpoint['model_state_dict']
+                
+                # Extract architecture info from the state dict
+                # pred.0.weight shape is [hidden_dim, input_dim]
+                first_layer_weight = state_dict['pred.0.weight']
+                hidden_dim, input_dim = first_layer_weight.shape
+                
+                logger.info(f"Detected MLP architecture: input_dim={input_dim}, hidden_dim={hidden_dim}")
+                
+                # Create model with correct architecture
+                model = SimpleMLP(input_dim=input_dim, hidden_dim=hidden_dim, output_dim=1)
+                
+                # Filter state dict to match our model structure (map pred.0 -> pred.0, pred.2 -> pred.2)
+                filtered_state_dict = {}
+                for key, value in state_dict.items():
+                    if key.startswith('pred.'):
+                        # Map pred.0.weight -> 0.weight, pred.0.bias -> 0.bias, etc.
+                        new_key = key.replace('pred.', '')
+                        filtered_state_dict[new_key] = value
+                
+                model.pred.load_state_dict(filtered_state_dict)
+                logger.info("Successfully loaded pre-trained MLP model")
                 return model
-            except Exception as state_dict_error:
-                # Fallback to loading full model (less safe but might be needed for older models)
-                logger.warning(f"Could not load as state dict: {state_dict_error}, trying full model load")
-                try:
-                    model = torch.load(mlp_path, map_location=torch.device('cpu'), weights_only=False)
-                    return model
-                except Exception as full_load_error:
-                    logger.warning(f"Could not load full model either: {full_load_error}")
-                    return None
+                
+            else:
+                # Try loading as direct model (legacy format)
+                logger.warning("Attempting to load as direct model (legacy format)")
+                return checkpoint
+                
         else:
             logger.warning(f"Pre-trained MLP not found at {mlp_path}")
             return None
+            
     except Exception as e:
         logger.warning(f"Could not load pre-trained MLP: {e}")
         return None
-
-
-# Load MLP model (or None if not available)
-mlp_model = load_pretrained_mlp()
 
 
 def mlp_score(embeddings_or_query, dde_features_or_triple, index_or_dde_features) -> float:

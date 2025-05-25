@@ -150,14 +150,14 @@ class TestOpenAIEmbed:
         mock_client = MagicMock()
         mock_response = MagicMock()
         mock_response.data = [MagicMock()]
-        mock_response.data[0].embedding = [0.1] * 1536
+        mock_response.data[0].embedding = [0.1] * 1536  # OpenAI returns 1536 dims
         mock_client.embeddings.create.return_value = mock_response
         mock_get_client.return_value = mock_client
         
         result = openai_embed("test text")
         
         assert isinstance(result, np.ndarray)
-        assert result.shape == (1536,)
+        assert result.shape == (1024,)  # But we truncate to 1024 for consistency
         assert result.dtype == np.float32
         mock_client.embeddings.create.assert_called_once_with(
             model="text-embedding-3-small",
@@ -176,7 +176,7 @@ class TestOpenAIEmbed:
         result = openai_embed("test text")
         
         assert isinstance(result, np.ndarray)
-        assert result.shape == (1536,)
+        assert result.shape == (1024,)  # Error fallback returns 1024 dims, not 1536
         assert result.dtype == np.float32
         assert np.allclose(result, 0.0)  # Should return zero vector on error
 

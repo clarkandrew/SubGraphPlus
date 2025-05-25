@@ -107,21 +107,31 @@ class TestMLPModel(unittest.TestCase):
     @patch('app.retriever.config')
     def test_load_pretrained_mlp_success(self, mock_config):
         """Test successful loading of pretrained MLP"""
-        # Create a temporary model file
+        # Create a temporary model file with the correct checkpoint format
         with tempfile.NamedTemporaryFile(suffix='.pth', delete=False) as tmp_file:
-            torch.save(self.test_model.state_dict(), tmp_file.name)
+            # Create a checkpoint that matches the real model format
+            checkpoint = {
+                'config': {'test': 'config'},
+                'model_state_dict': {
+                    'pred.0.weight': torch.randn(64, 773),
+                    'pred.0.bias': torch.randn(64),
+                    'pred.2.weight': torch.randn(1, 64),
+                    'pred.2.bias': torch.randn(1)
+                }
+            }
+            torch.save(checkpoint, tmp_file.name)
             mock_config.MLP_MODEL_PATH = tmp_file.name
             
-            # Mock the model creation in the load function
-            with patch('app.retriever.SimpleMLP') as mock_mlp_class:
-                mock_mlp_class.return_value = self.test_model
-                
-                # Test loading
-                from app.retriever import load_pretrained_mlp
-                loaded_model = load_pretrained_mlp()
-                
-                self.assertIsNotNone(loaded_model)
-                mock_mlp_class.assert_called_once()
+            # Test loading
+            from app.retriever import load_pretrained_mlp
+            loaded_model = load_pretrained_mlp()
+            
+            self.assertIsNotNone(loaded_model)
+            # Verify the model has the correct architecture
+            self.assertEqual(loaded_model.pred[0].in_features, 773)
+            self.assertEqual(loaded_model.pred[0].out_features, 64)
+            self.assertEqual(loaded_model.pred[2].in_features, 64)
+            self.assertEqual(loaded_model.pred[2].out_features, 1)
         
         # Clean up
         os.unlink(tmp_file.name)

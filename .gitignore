@@ -74,12 +74,22 @@ coverage.xml
 .env.production.local
 
 # Application specific
-# Model files
+# Model files and caches
 models/data_files/webqsp/triple_scores/train.pth
 *.pth
 *.pkl
+
+# Model directories - keep structure but ignore downloaded models
 models/mlp/
 models/hf/
+models/embeddings/models--*/  # HuggingFace model cache
+models/embeddings/.locks/     # HuggingFace lock files
+models/mlx_llm/              # MLX language models  
+models/mlx_embedding/        # MLX embedding models
+
+# Keep model directory structure
+!models/
+!models/.gitkeep
 
 # Data files
 *.db
@@ -123,3 +133,4 @@ list_file_tree.py
 tools/
 models/mlp/mlp.pth
 src/models/embeddings
+models/embeddings/**

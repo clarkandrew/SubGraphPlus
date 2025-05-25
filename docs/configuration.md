@@ -13,7 +13,7 @@ This guide covers all configuration options for SubgraphRAG+, including environm
   "MODEL_BACKEND": "openai",
   "FAISS_INDEX_PATH": "data/faiss_index.bin",
   "TOKEN_BUDGET": 4000,
-  "MLP_MODEL_PATH": "models/mlp_pretrained.pt",
+  "MLP_MODEL_PATH": "models/mlp/mlp.pth",
   "CACHE_DIR": "cache/",
   "MAX_DDE_HOPS": 2,
   "LOG_LEVEL": "INFO",
@@ -82,6 +82,25 @@ Defines the JSON schema for validating the main configuration file.
 | `HUGGINGFACE_API_KEY` | HuggingFace API key | - | ❌ |
 | `ANTHROPIC_API_KEY` | Anthropic API key | - | ❌ |
 
+### Embedding Model Configuration
+
+> **IMPORTANT**: The embedding model must match the model used to train the MLP. Changing this will break the MLP scoring functionality.
+
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `EMBEDDING_MODEL` | HuggingFace embedding model | `Alibaba-NLP/gte-large-en-v1.5` | ✅ |
+
+**Model Storage**: Embedding models are automatically cached in `models/embeddings/` directory. The cache includes:
+- Model weights and configuration
+- Tokenizer files
+- Model metadata
+
+**Model Specifications**:
+- **Default Model**: `Alibaba-NLP/gte-large-en-v1.5`
+- **Embedding Dimension**: 1024
+- **Context Window**: 512 tokens
+- **Trained for**: General text embedding tasks
+
 ### MLX Configuration (Apple Silicon)
 
 > **Note**: MLX is only available on Apple Silicon Macs and requires separate installation: `pip install mlx mlx-lm`
@@ -91,13 +110,16 @@ Defines the JSON schema for validating the main configuration file.
 | `USE_MLX_LLM` | Enable MLX functionality | `false` | ❌ |
 | `MLX_LLM_MODEL` | MLX LLM model identifier | `mlx-community/Mistral-7B-Instruct-v0.2-4bit-mlx` | ❌ |
 | `MLX_LLM_MODEL_PATH` | Local path to MLX LLM model | - | ❌ |
-| `MLX_EMBEDDING_MODEL` | MLX embedding model identifier | `mlx-community/all-MiniLM-L6-v2-mlx` | ❌ |
+| `MLX_EMBEDDING_MODEL` | MLX embedding model identifier | `mlx-community/gte-large-en-v1.5-mlx` | ❌ |
 | `MLX_EMBEDDING_MODEL_PATH` | Local path to MLX embedding model | - | ❌ |
-| `EMBEDDING_MODEL` | Standard embedding model (non-MLX) | `all-MiniLM-L6-v2` | ❌ |
 
 **MLX Model Examples:**
 - **LLM Models**: `mlx-community/Mistral-7B-Instruct-v0.2-4bit-mlx`, `mlx-community/Meta-Llama-3-8B-Instruct-4bit-mlx`
-- **Embedding Models**: `mlx-community/all-MiniLM-L6-v2-mlx`, `mlx-community/bge-small-en-v1.5-mlx`
+- **Embedding Models**: `mlx-community/gte-large-en-v1.5-mlx`, `mlx-community/bge-small-en-v1.5-mlx`
+
+**MLX Model Storage**: When using MLX models, they are cached in:
+- `models/mlx_llm/` for language models
+- `models/mlx_embedding/` for embedding models
 
 ### Performance Settings
 
@@ -188,7 +210,7 @@ MLX_LLM_MODEL=mlx-community/Mistral-7B-Instruct-v0.2-4bit-mlx
 # MLX_LLM_MODEL_PATH=models/mlx_llm  # Optional: use local model
 
 # MLX Embedding Configuration  
-MLX_EMBEDDING_MODEL=mlx-community/all-MiniLM-L6-v2-mlx
+MLX_EMBEDDING_MODEL=mlx-community/gte-large-en-v1.5-mlx
 # MLX_EMBEDDING_MODEL_PATH=models/mlx_embedding  # Optional: use local model
 
 # Standard settings

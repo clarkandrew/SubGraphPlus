@@ -8,6 +8,14 @@ from pathlib import Path
 from dotenv import load_dotenv
 load_dotenv()
 
+# Add this at the top after imports, before any expensive operations
+TESTING = os.getenv('TESTING', '').lower() in ('1', 'true', 'yes')
+DISABLE_MODELS = os.getenv('DISABLE_MODELS', '').lower() in ('1', 'true', 'yes')
+
+# If testing, skip expensive operations
+if TESTING:
+    logging.basicConfig(level=logging.CRITICAL)  # Reduce logging noise
+
 # Set up logging
 logging.basicConfig(
     level=logging.INFO,

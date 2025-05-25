@@ -6,28 +6,35 @@ from functools import lru_cache
 
 from app.config import config, OPENAI_API_KEY, EMBEDDING_MODEL
 
+# Add testing check at the top
+TESTING = os.getenv('TESTING', '').lower() in ('1', 'true', 'yes')
+
 logger = logging.getLogger(__name__)
 
 # Check for Hugging Face transformers (primary for embeddings)
+# Skip during testing to prevent slow imports
 HF_AVAILABLE = False
-try:
-    from sentence_transformers import SentenceTransformer
-    HF_AVAILABLE = True
-    logger.info("Sentence Transformers is available and will be used for embeddings")
-except ImportError:
-    logger.warning("Sentence Transformers not available, will not be able to use local embeddings")
+if not TESTING:
+    try:
+        from sentence_transformers import SentenceTransformer
+        HF_AVAILABLE = True
+        logger.info("Sentence Transformers is available and will be used for embeddings")
+    except ImportError:
+        logger.warning("Sentence Transformers not available, will not be able to use local embeddings")
 
 # Check for OpenAI (fallback)
+# Skip during testing to prevent API calls
 OPENAI_AVAILABLE = False
-try:
-    from openai import OpenAI
-    if OPENAI_API_KEY:
-        OPENAI_AVAILABLE = True
-        logger.info("OpenAI API is available and will be used as embedding fallback")
-    else:
-        logger.warning("OpenAI API key not set, will not be able to use OpenAI embedding fallback")
-except ImportError:
-    logger.warning("OpenAI package not installed, will not be able to use OpenAI embedding fallback")
+if not TESTING:
+    try:
+        from openai import OpenAI
+        if OPENAI_API_KEY:
+            OPENAI_AVAILABLE = True
+            logger.info("OpenAI API is available and will be used as embedding fallback")
+        else:
+            logger.warning("OpenAI API key not set, will not be able to use OpenAI embedding fallback")
+    except ImportError:
+        logger.warning("OpenAI package not installed, will not be able to use OpenAI embedding fallback")
 
 
 # Cache for embedding models
@@ -39,8 +46,8 @@ def get_hf_model():
     
     model_name = EMBEDDING_MODEL
     
-    # Set up cache directory to src/models
-    cache_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'models', 'embeddings')
+    # Set up cache directory to models/embeddings (where user moved the models)
+    cache_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 'models', 'embeddings')
     os.makedirs(cache_dir, exist_ok=True)
     
     logger.info(f"Loading HuggingFace embedding model: {model_name}")
@@ -87,11 +94,26 @@ def openai_embed(text: str) -> np.ndarray:
             input=text
         )
         embedding = np.array(response.data[0].embedding).astype(np.float32)
+        
+        # CRITICAL FIX: OpenAI embeddings are 1536-dim but we need 1024-dim to match HuggingFace
+        # Truncate to first 1024 dimensions to maintain consistency
+        if embedding.shape[0] > 1024:
+            logger.warning(f"Truncating OpenAI embedding from {embedding.shape[0]} to 1024 dimensions for consistency")
+            embedding = embedding[:1024]
+        elif embedding.shape[0] < 1024:
+            # Pad with zeros if somehow smaller
+            logger.warning(f"Padding OpenAI embedding from {embedding.shape[0]} to 1024 dimensions")
+            padding = np.zeros(1024 - embedding.shape[0], dtype=np.float32)
+            embedding = np.concatenate([embedding, padding])
+            
+        # Renormalize after truncation/padding
+        embedding = embedding / np.linalg.norm(embedding)
         return embedding
+        
     except Exception as e:
         logger.error(f"OpenAI embedding error: {e}")
-        # Return zeros as fallback
-        return np.zeros(1536).astype(np.float32)
+        # Return zeros as fallback with correct dimension
+        return np.zeros(1024).astype(np.float32)
 
 
 def embed_text(text: str) -> np.ndarray:
