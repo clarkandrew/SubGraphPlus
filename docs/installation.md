@@ -1,33 +1,48 @@
-# 🚀 Installation Guide
+# 🛠️ Installation Guide
 
-This guide provides step-by-step instructions for installing SubgraphRAG+ in different environments.
+This guide provides step-by-step instructions for installing SubgraphRAG+ on different platforms and environments.
+
+## 🎯 Choose Your Installation Method
+
+| Method | Best For | Time | Requirements |
+|--------|----------|------|-------------|
+| **[🐳 Docker Setup](#-docker-installation-recommended)** | Production, quick start | 5-10 min | Docker |
+| **[🔧 Development Setup](#-development-installation)** | Contributors, customization | 10-15 min | Python 3.9+ |
+| **[🍎 Apple Silicon](#-apple-silicon-optimization)** | M1/M2/M3 Mac optimization | 15-20 min | macOS + Python |
+
+---
 
 ## 📋 Prerequisites
 
 ### System Requirements
 
-| Component | Minimum | Recommended |
-|-----------|---------|-------------|
-| **CPU** | 2 cores | 4+ cores |
-| **RAM** | 4GB | 8GB+ |
-| **Storage** | 10GB free | 50GB+ SSD |
-| **OS** | Linux, macOS, Windows (WSL2) | Linux/macOS |
+| Component | Minimum | Recommended | Notes |
+|-----------|---------|-------------|--------|
+| **CPU** | 2 cores | 4+ cores | Intel or Apple Silicon |
+| **RAM** | 4GB | 8GB+ | More needed for large models |
+| **Storage** | 10GB free | 50GB+ SSD | Fast storage improves performance |
+| **OS** | Linux, macOS, Windows (WSL2) | Linux/macOS preferred |
 
-### Software Dependencies
+### Software Requirements
 
-#### For Docker Setup (Recommended)
-- **Docker Engine**: 20.10+ 
-- **Docker Compose**: v2.0+
-- **Git**: Latest version
+#### All Methods
+- **Git**: Latest version for repository cloning
 
-#### For Local Development
-- **Python**: 3.9+ (3.11+ recommended)
-- **Git**: Latest version
-- **Node.js**: 16+ (for frontend development)
+#### Docker Method
+- **Docker Engine**: 20.10+ with Docker Compose v2
+- **4GB+ RAM** available for containers
+
+#### Development Method  
+- **Python**: 3.9+ (3.11+ recommended, tested up to 3.13)
+- **pip**: Latest version
+
+---
 
 ## 🐳 Docker Installation (Recommended)
 
-### 1. Install Docker
+**Best for: Production deployments, quick evaluation, users who want everything configured automatically**
+
+### Step 1: Install Docker
 
 #### macOS
 ```bash
@@ -35,7 +50,7 @@ This guide provides step-by-step instructions for installing SubgraphRAG+ in dif
 brew install --cask docker
 # OR download from https://docker.com/products/docker-desktop
 
-# Start Docker Desktop
+# Start Docker Desktop and wait for it to be ready
 open -a Docker
 ```
 
@@ -52,38 +67,70 @@ newgrp docker
 # Install Docker Compose
 sudo apt-get update
 sudo apt-get install docker-compose-plugin
+
+# Verify installation
+docker --version
+docker compose version
 ```
 
 #### Windows
 1. Install [Docker Desktop for Windows](https://docker.com/products/docker-desktop)
-2. Enable WSL2 integration
+2. Enable WSL2 integration in Docker Desktop settings
 3. Restart your system
 
-### 2. Clone and Setup
+### Step 2: Clone and Setup
 
 ```bash
 # Clone the repository
 git clone https://github.com/your-username/SubgraphRAGPlus.git
 cd SubgraphRAGPlus
 
-# One-command setup
-make setup-all
+# Run the interactive Docker setup script
+./bin/setup_docker.sh
 
-# Verify installation
-curl http://localhost:8000/health
+# Or use the make shortcut
+make setup-all
 ```
 
-### 3. Access the Application
+The setup script will:
+- ✅ Check Docker installation and requirements
+- ✅ Pull and configure all necessary container images
+- ✅ Set up Neo4j database with proper configuration
+- ✅ Configure networking and environment variables
+- ✅ Start all services and verify they're working
+- ✅ Load sample data for testing
 
-| Service | URL | Description |
+### Step 3: Verify Installation
+
+```bash
+# Check service status
+docker ps
+
+# Test API health
+curl http://localhost:8000/healthz
+
+# Test a simple query
+curl -X POST "http://localhost:8000/query" \
+  -H "X-API-KEY: default_key_for_dev_only" \
+  -H "Content-Type: application/json" \
+  -d '{"question": "What is artificial intelligence?", "visualize_graph": true}'
+```
+
+### Access Points
+
+| Service | URL | Credentials |
 |---------|-----|-------------|
-| **API** | http://localhost:8000 | Main API server |
-| **API Docs** | http://localhost:8000/docs | Interactive documentation |
-| **Neo4j Browser** | http://localhost:7474 | Graph database UI |
+| **API Server** | http://localhost:8000 | API Key: `default_key_for_dev_only` |
+| **API Documentation** | http://localhost:8000/docs | - |
+| **Neo4j Browser** | http://localhost:7474 | User: `neo4j`, Password: `password` |
 
-## 🐍 Local Python Installation
+---
 
-### 1. Install Python Dependencies
+## 🔧 Development Installation
+
+**Best for: Contributors, developers who want to modify code, advanced customization**
+
+### Step 1: Install Python
 
 #### macOS
 ```bash
@@ -91,470 +138,306 @@ curl http://localhost:8000/health
 brew install python@3.11
 
 # Verify installation
-python3.11 --version
+python3.11 --version  # Should show 3.11.x
 ```
 
 #### Linux (Ubuntu/Debian)
 ```bash
-# Install Python 3.11
+# Install Python 3.11 and development tools
 sudo apt update
-sudo apt install python3.11 python3.11-venv python3.11-dev
+sudo apt install python3.11 python3.11-venv python3.11-dev \
+                 build-essential libssl-dev libffi-dev git
 
-# Install additional dependencies
-sudo apt install build-essential libssl-dev libffi-dev
+# Verify installation
+python3.11 --version
 ```
 
-#### Windows (WSL2)
+#### Windows (WSL2 Required)
 ```bash
 # Update package list
 sudo apt update
 
-# Install Python 3.11
-sudo apt install python3.11 python3.11-venv python3.11-dev
+# Install Python and tools
+sudo apt install python3.11 python3.11-venv python3.11-dev \
+                 build-essential git
+
+# Verify installation
+python3.11 --version
 ```
 
-### 2. Setup Project Environment
+### Step 2: Clone and Setup
 
 ```bash
 # Clone the repository
 git clone https://github.com/your-username/SubgraphRAGPlus.git
 cd SubgraphRAGPlus
 
-# Create virtual environment
-python3.11 -m venv venv
+# Run the interactive development setup script
+./bin/setup_dev.sh
 
-# Activate virtual environment
-source venv/bin/activate  # Linux/macOS
-# OR: venv\Scripts\activate  # Windows
-
-# Install dependencies
-pip install --upgrade pip
-pip install -r requirements-dev.txt
-
-# Install project in development mode
-pip install -e .
+# Or for advanced users, use options:
+./bin/setup_dev.sh --python python3.11 --run-tests
 ```
 
-### 3. Configure Environment
+The setup script will:
+- ✅ Detect and validate your Python version
+- ✅ Create and configure a virtual environment
+- ✅ Install all Python dependencies
+- ✅ Set up Neo4j (Docker or guide you through local installation)
+- ✅ Create configuration files from templates
+- ✅ Initialize database schema and indexes
+- ✅ Download required AI models
+- ✅ Load sample data (optional)
+- ✅ Run tests to verify installation (optional)
+
+### Step 3: Manual Configuration (if needed)
+
+If the setup script can't auto-configure everything:
 
 ```bash
-# Copy environment template
+# Activate virtual environment
+source venv/bin/activate
+
+# Create configuration from template
 cp .env.example .env
 
-# Edit configuration (use your preferred editor)
+# Edit configuration with your preferred editor
 nano .env  # or vim, code, etc.
 ```
 
-**Required environment variables:**
+**Essential configuration variables:**
 ```bash
-# Database
+# Database connection
 NEO4J_URI=neo4j://localhost:7687
 NEO4J_USER=neo4j
-NEO4J_PASSWORD=your-secure-password
+NEO4J_PASSWORD=password
 
-# API Security
-API_KEY_SECRET=your-secret-key
+# API security
+API_KEY_SECRET=your-secret-key-here
 
-# Optional: OpenAI integration
+# Choose your LLM backend
+MODEL_BACKEND=openai
 OPENAI_API_KEY=your-openai-key
+
+# Or use HuggingFace
+# MODEL_BACKEND=hf
+
+# Or use MLX on Apple Silicon
+# MODEL_BACKEND=mlx
+# USE_MLX_LLM=true
 ```
 
-### 4. Install and Setup Neo4j
-
-#### Option A: Docker Neo4j (Recommended)
-```bash
-# Start Neo4j container
-make neo4j-start
-
-# Apply schema migrations
-make migrate-schema
-```
-
-#### Option B: Local Neo4j Installation
-
-**macOS:**
-```bash
-# Install Neo4j
-brew install neo4j
-
-# Start Neo4j service
-brew services start neo4j
-
-# Set initial password
-neo4j-admin set-initial-password your-password
-```
-
-**Linux:**
-```bash
-# Add Neo4j repository
-wget -O - https://debian.neo4j.com/neotechnology.gpg.key | sudo apt-key add -
-echo 'deb https://debian.neo4j.com stable 4.4' | sudo tee /etc/apt/sources.list.d/neo4j.list
-
-# Install Neo4j
-sudo apt update
-sudo apt install neo4j
-
-# Start Neo4j service
-sudo systemctl enable neo4j
-sudo systemctl start neo4j
-
-# Set initial password
-sudo neo4j-admin set-initial-password your-password
-```
-
-### 5. Initialize and Start
+### Step 4: Start Development Server
 
 ```bash
-# Apply database migrations
-python scripts/migrate_schema.py
-
-# Load sample data (optional)
-python scripts/stage_ingest.py --sample
-python scripts/ingest_worker.py --process-all
-
-# Start the application
-python src/main.py --reload
-```
-
-## 🍎 MLX Installation (Apple Silicon)
-
-MLX provides optimized machine learning on Apple Silicon Macs. This section is only relevant for Apple Silicon (M1/M2/M3) Mac users.
-
-### 1. Prerequisites
-
-- **Apple Silicon Mac** (M1, M2, or M3 chip)
-- **macOS 13.3+** (Ventura or later)
-- **Python 3.9+** (3.11+ recommended)
-
-### 2. Install MLX
-
-```bash
-# Activate your virtual environment first
+# Activate virtual environment
 source venv/bin/activate
 
-# Install MLX and related packages
-pip install mlx mlx-lm
+# Start development server with auto-reload
+python src/main.py --reload
 
-# Verify MLX installation
-python -c "import mlx.core as mx; print(f'✅ MLX installed: {mx.__version__}')"
+# Or use make command
+make serve
 ```
 
-### 3. Configure MLX Environment
+### Step 5: Verify Installation
 
 ```bash
-# Enable MLX in your .env file
-echo "USE_MLX_LLM=true" >> .env
-echo "MODEL_BACKEND=mlx" >> .env
-
-# Set MLX models (these will be downloaded automatically)
-echo "MLX_LLM_MODEL=mlx-community/Mistral-7B-Instruct-v0.2-4bit-mlx" >> .env
-echo "MLX_EMBEDDING_MODEL=mlx-community/all-MiniLM-L6-v2-mlx" >> .env
-```
-
-### 4. Download MLX Models
-
-Models will be downloaded automatically on first use, but you can pre-download them:
-
-```bash
-# Create models directory
-mkdir -p models/mlx
-
-# Download LLM model (optional - will auto-download)
-python -c "
-from mlx_lm import load
-model, tokenizer = load('mlx-community/Mistral-7B-Instruct-v0.2-4bit-mlx')
-print('✅ LLM model downloaded')
-"
-
-# Download embedding model (optional - will auto-download)
-python -c "
-from sentence_transformers import SentenceTransformer
-model = SentenceTransformer('all-MiniLM-L6-v2')
-print('✅ Embedding model downloaded')
-"
-```
-
-### 5. Verify MLX Setup
-
-```bash
-# Test MLX functionality
-python -c "
-import os
-os.environ['USE_MLX_LLM'] = 'true'
-from app.ml.llm import LLMService
-from app.ml.embedder import EmbedderService
-
-# Test LLM
-llm = LLMService()
-print('✅ MLX LLM service initialized')
-
-# Test embedder
-embedder = EmbedderService()
-print('✅ MLX embedder service initialized')
-"
-```
-
-### 6. Performance Optimization
-
-For optimal MLX performance:
-
-```bash
-# Set memory allocation (in .env)
-echo "MLX_MEMORY_LIMIT=8192" >> .env  # 8GB limit
-
-# Enable unified memory
-echo "MLX_USE_UNIFIED_MEMORY=true" >> .env
-
-# Set thread count (optional)
-echo "MLX_NUM_THREADS=4" >> .env
-```
-
-### MLX Troubleshooting
-
-#### Common MLX Issues
-
-**1. MLX Import Error**
-```bash
-# Error: No module named 'mlx'
-# Solution: Ensure you're on Apple Silicon
-python -c "import platform; print(platform.processor())"
-# Should show 'arm' for Apple Silicon
-
-# Reinstall MLX
-pip uninstall mlx mlx-lm
-pip install mlx mlx-lm
-```
-
-**2. Model Download Issues**
-```bash
-# Error: Failed to download model
-# Solution: Check internet connection and disk space
-df -h  # Check disk space
-ping huggingface.co  # Check connectivity
-
-# Clear cache and retry
-rm -rf ~/.cache/huggingface
-```
-
-**3. Memory Issues**
-```bash
-# Error: Out of memory
-# Solution: Reduce model size or memory limit
-echo "MLX_LLM_MODEL=mlx-community/Mistral-7B-Instruct-v0.2-8bit-mlx" >> .env
-echo "MLX_MEMORY_LIMIT=4096" >> .env
-```
-
-**4. Performance Issues**
-```bash
-# Check system resources
-top -l 1 | grep "CPU usage"
-vm_stat | grep "Pages free"
-
-# Monitor MLX memory usage
-python -c "
-import mlx.core as mx
-print(f'MLX memory: {mx.metal.get_active_memory() / 1024**3:.2f} GB')
-"
-```
-
-## �� Development Setup
-
-For contributors and developers:
-
-```bash
-# Clone your fork
-git clone https://github.com/your-username/SubgraphRAGPlus.git
-cd SubgraphRAGPlus
-
-# Setup development environment
-./bin/setup_dev.sh
-
-# Install pre-commit hooks
-pre-commit install
-
-# Run tests to verify setup
-make test
-```
-
-## ✅ Verification
-
-### Health Checks
-
-```bash
-# Basic health check
-curl http://localhost:8000/health
-
-# Detailed readiness check
+# Run health checks
+curl http://localhost:8000/healthz
 curl http://localhost:8000/readyz
 
-# Test API functionality
-curl -X POST "http://localhost:8000/api/v1/query" \
-  -H "X-API-KEY: your-api-key" \
+# Run test suite
+make test
+
+# Test a query
+curl -X POST "http://localhost:8000/query" \
+  -H "X-API-KEY: your-secret-key-here" \
   -H "Content-Type: application/json" \
-  -d '{"question": "What is artificial intelligence?"}'
+  -d '{"question": "test query", "visualize_graph": false}'
 ```
-
-### Component Status
-
-```bash
-# Check Neo4j connection
-curl http://localhost:8000/health | jq '.neo4j'
-
-# Check vector database
-curl http://localhost:8000/health | jq '.faiss'
-
-# View system metrics
-curl http://localhost:8000/metrics
-```
-
-## 🔧 Troubleshooting
-
-### Common Issues
-
-#### 1. Docker Daemon Not Running
-
-**Error:** `Cannot connect to the Docker daemon`
-
-**Solution:**
-```bash
-# macOS: Start Docker Desktop
-open -a Docker
-
-# Linux: Start Docker service
-sudo systemctl start docker
-
-# Verify Docker is running
-docker info
-```
-
-#### 2. Port Conflicts
-
-**Error:** `Port 7474/7687 is already allocated`
-
-**Solution:**
-```bash
-# Check what's using the ports
-lsof -i :7474
-lsof -i :7687
-
-# Stop conflicting services
-brew services stop neo4j    # macOS
-sudo systemctl stop neo4j   # Linux
-
-# Or modify ports in docker-compose.yml
-```
-
-#### 3. Python Import Errors
-
-**Error:** `ModuleNotFoundError: No module named 'app'`
-
-**Solution:**
-```bash
-# Ensure virtual environment is activated
-source venv/bin/activate
-
-# Reinstall in development mode
-pip install -e .
-
-# Verify installation
-python -c "from app.api import app; print('✅ Import successful')"
-```
-
-#### 4. Neo4j Connection Failed
-
-**Error:** `Failed to connect to Neo4j`
-
-**Solution:**
-```bash
-# Check Neo4j status
-docker ps | grep neo4j
-
-# View Neo4j logs
-docker logs subgraphrag_neo4j
-
-# Reset Neo4j container
-docker-compose down
-docker-compose up -d neo4j
-
-# Wait for startup and retry
-sleep 30
-curl http://localhost:7474
-```
-
-#### 5. Permission Issues (Linux)
-
-**Error:** `Permission denied`
-
-**Solution:**
-```bash
-# Add user to docker group
-sudo usermod -aG docker $USER
-newgrp docker
-
-# Fix file permissions
-sudo chown -R $USER:$USER .
-chmod +x bin/*.sh
-```
-
-### Advanced Troubleshooting
-
-#### Complete Reset
-
-If all else fails:
-
-```bash
-# Stop all services
-docker-compose down -v
-docker system prune -a
-
-# Remove virtual environment
-rm -rf venv
-
-# Clean data directories
-rm -rf data/faiss data/neo4j cache logs
-
-# Start fresh
-./bin/setup_dev.sh
-```
-
-#### Debug Mode
-
-Enable detailed logging:
-
-```bash
-# Set debug environment
-export DEBUG=true
-export LOG_LEVEL=DEBUG
-
-# Run with verbose output
-./bin/setup_dev.sh --verbose
-
-# Check logs
-tail -f logs/app.log
-```
-
-## 🆘 Getting Help
-
-If you encounter issues not covered here:
-
-1. **Check existing issues**: [GitHub Issues](https://github.com/your-username/SubgraphRAGPlus/issues)
-2. **Search discussions**: [GitHub Discussions](https://github.com/your-username/SubgraphRAGPlus/discussions)
-3. **Create a new issue** with:
-   - Your operating system and version
-   - Docker version (`docker --version`)
-   - Python version (`python --version`)
-   - Complete error messages
-   - Steps to reproduce
-
-## 📚 Next Steps
-
-After successful installation:
-
-1. **Explore the API**: Visit http://localhost:8000/docs
-2. **Read the documentation**: Check out [docs/README.md](README.md)
-3. **Try examples**: See [API Usage Examples](api_examples.md)
-4. **Join the community**: [GitHub Discussions](https://github.com/your-username/SubgraphRAGPlus/discussions)
 
 ---
 
-**🎉 Congratulations! SubgraphRAG+ is now installed and ready to use.** 
+## 🍎 Apple Silicon Optimization
+
+**Best for: M1/M2/M3 Mac users who want optimal performance**
+
+### Why MLX?
+- **Native Performance**: Up to 2x faster inference on Apple Silicon
+- **Memory Efficient**: Lower memory usage compared to PyTorch
+- **Integrated**: Seamless integration with existing workflows
+
+### Installation Steps
+
+```bash
+# Follow development installation first
+./bin/setup_dev.sh
+
+# The setup script will auto-detect Apple Silicon and prompt for MLX
+# Or manually install MLX:
+pip install mlx mlx-lm
+
+# Configure MLX in .env
+echo "MODEL_BACKEND=mlx" >> .env
+echo "USE_MLX_LLM=true" >> .env
+```
+
+### MLX Configuration
+
+Create or update `config/config.json`:
+```json
+{
+  "MODEL_BACKEND": "mlx",
+  "MLX_MODEL_PATH": "mlx-community/Mistral-7B-Instruct-v0.2-8bit-mlx",
+  "MLX_MAX_TOKENS": 2048,
+  "TOKEN_BUDGET": 8000
+}
+```
+
+### Verify MLX Setup
+
+```bash
+# Test MLX installation
+python -c "import mlx.core as mx; print('MLX version:', mx.__version__)"
+
+# Test MLX LLM
+python scripts/test_embedder.py
+
+# Start server with MLX
+make serve
+```
+
+See **[MLX Integration Guide](mlx.md)** for advanced MLX configuration.
+
+---
+
+## 🚦 Verification & Testing
+
+### Quick Health Check
+
+After any installation method:
+
+```bash
+# 1. Basic health
+curl http://localhost:8000/healthz
+
+# 2. Dependency check
+curl http://localhost:8000/readyz
+
+# 3. Simple query test
+curl -X POST "http://localhost:8000/query" \
+  -H "X-API-KEY: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{"question": "What is machine learning?", "visualize_graph": true}'
+```
+
+### Expected Results
+
+1. **Health check** should return: `{"status": "ok"}`
+2. **Readiness check** should show all dependencies as `"ok"`
+3. **Query test** should return streaming response with answer and graph data
+
+### Run Test Suite
+
+```bash
+# Full test suite (development setup only)
+make test
+
+# Quick smoke tests
+make test-smoke
+
+# API integration tests
+make test-api
+```
+
+---
+
+## 🛠️ Common Setup Commands
+
+### Docker Environment
+```bash
+make setup-all          # Full Docker setup
+make docker-start       # Start services
+make docker-stop        # Stop services
+make docker-logs        # View logs
+```
+
+### Development Environment
+```bash
+make setup-dev          # Full development setup
+make serve              # Start development server
+make test               # Run test suite
+make lint               # Check code quality
+```
+
+### Database Operations
+```bash
+make neo4j-start        # Start Neo4j container
+make migrate-schema     # Apply database schema
+make ingest-sample      # Load sample data
+```
+
+---
+
+## 🆘 Troubleshooting
+
+### Quick Fixes
+
+**Setup script hangs:**
+```bash
+# Use timeout protection
+./bin/setup_dev.sh --skip-tests --skip-sample_data
+```
+
+**Docker issues:**
+```bash
+# Restart Docker
+docker system prune -f
+./bin/setup_docker.sh
+```
+
+**Module import errors:**
+```bash
+# Reinstall in development mode
+source venv/bin/activate
+pip install -e .
+```
+
+**Neo4j connection issues:**
+```bash
+# Check Neo4j status
+docker ps | grep neo4j
+curl http://localhost:7474
+```
+
+### Comprehensive Troubleshooting
+
+For detailed troubleshooting, see **[Troubleshooting Guide](troubleshooting.md)**.
+
+### Get Help
+
+- **🐛 Installation Issues**: [GitHub Issues](https://github.com/your-username/SubgraphRAGPlus/issues)
+- **❓ Setup Questions**: [GitHub Discussions](https://github.com/your-username/SubgraphRAGPlus/discussions)
+- **📖 Documentation**: [docs/README.md](README.md)
+
+---
+
+## 🎉 Next Steps
+
+After successful installation:
+
+1. **📡 Learn the API**: [API Reference](api_reference.md)
+2. **🏗️ Understand Architecture**: [Architecture Guide](architecture.md)
+3. **🔧 Contribute**: [Development Guide](development.md)
+4. **🚀 Deploy**: [Deployment Guide](deployment.md)
+
+---
+
+<div align="center">
+
+**🎊 Installation Complete!** 
+
+Visit **[http://localhost:8000/docs](http://localhost:8000/docs)** to explore the API
+
+</div> 

@@ -1,102 +1,200 @@
 # 📚 SubgraphRAG+ Documentation
 
-Welcome to the comprehensive documentation for SubgraphRAG+, a production-ready knowledge graph question answering system.
+Welcome to the comprehensive documentation for **SubgraphRAG+**, an advanced knowledge graph-powered question answering system that combines graph traversal, dense retrieval, and machine learning for intelligent information extraction.
 
-## 🚀 Quick Navigation
+## 🚀 Quick Start
 
-| 📖 **Getting Started** | 🔧 **Development** | 🏢 **Operations** |
-|------------------------|-------------------|------------------|
-| [Quick Start Guide](../README.md#-quick-start) | [Development Setup](development.md) | [Production Deployment](deployment.md) |
-| [Installation Guide](installation.md) | [Contributing Guide](contributing.md) | [Configuration](configuration.md) |
-| [Architecture Overview](architecture.md) | [API Reference](api_reference.md) | [Troubleshooting](troubleshooting.md) |
+| I want to... | Go to... | Time needed |
+|--------------|----------|-------------|
+| **🏃‍♂️ Get started quickly** | [Installation Guide](installation.md) → Docker Setup | 5-10 min |
+| **🔧 Set up for development** | [Installation Guide](installation.md) → Development Setup | 10-15 min |
+| **🍎 Optimize for Apple Silicon** | [Installation Guide](installation.md) → Apple Silicon | 15-20 min |
+| **🐛 Fix issues** | [Troubleshooting Guide](troubleshooting.md) | As needed |
+| **📡 Learn the API** | [API Reference](api_reference.md) | 15-30 min |
 
-## 📋 Available Documentation
+---
 
-### 🏗️ Architecture & Design
-- **[System Architecture](architecture.md)** - High-level system design, components, and data flow
-- **[API Reference](api_reference.md)** - Complete REST API documentation with examples
+## 📖 Documentation Structure
 
-### 🛠️ Development & Setup
-- **[Installation Guide](installation.md)** - Step-by-step installation instructions for all platforms
-- **[Development Guide](development.md)** - Local development setup, workflows, and best practices
-- **[Contributing Guidelines](contributing.md)** - How to contribute to the project
-- **[Configuration Reference](configuration.md)** - Environment variables, settings, and customization
+### 🛠️ Setup & Installation
+- **[📦 Installation Guide](installation.md)** - Complete setup instructions for all platforms
+- **[🆘 Troubleshooting](troubleshooting.md)** - Solutions for common issues and problems
+- **[⚙️ Configuration](configuration.md)** - Environment variables and system configuration
 
-### 🚀 Deployment & Operations
-- **[Deployment Guide](deployment.md)** - Production deployment with Docker, Kubernetes, and scaling
-- **[Troubleshooting](troubleshooting.md)** - Common issues, solutions, and debugging techniques
+### 🏗️ Architecture & Development  
+- **[🏛️ Architecture Guide](architecture.md)** - System design and component overview
+- **[🔧 Development Guide](development.md)** - Contributing, testing, and development workflow
+- **[🤝 Contributing](contributing.md)** - Guidelines for contributors and code standards
 
-### 🍎 Platform-Specific Guides
-- **[MLX Integration](mlx.md)** - Apple Silicon optimization with MLX
-- **[Documentation Summary](DOCUMENTATION_SUMMARY.md)** - Overview of all documentation changes and updates
+### 📡 API & Usage
+- **[📋 API Reference](api_reference.md)** - Complete API documentation with examples
+- **[🚀 Deployment Guide](deployment.md)** - Production deployment and scaling
 
-## 🎯 Documentation by Use Case
+### 🧠 Advanced Topics
+- **[🍎 MLX Integration](mlx.md)** - Apple Silicon optimization with MLX
+- **[🤖 MLP Retriever](mlp_retriever.md)** - Technical details on the MLP scoring model
 
-### 👨‍💻 **For Developers Getting Started**
-1. [Installation Guide](installation.md) - Set up your environment
-2. [Development Guide](development.md) - Local development workflow
-3. [Architecture](architecture.md) - Understand the system design
-4. [API Reference](api_reference.md) - Start building integrations
+---
 
-### 🏢 **For Production Deployment**
-1. [Deployment Guide](deployment.md) - Production setup and scaling
-2. [Configuration](configuration.md) - Environment and security settings
-3. [Troubleshooting](troubleshooting.md) - Common production issues
+## 🎯 Choose Your Path
 
-### 🔬 **For Integration & Customization**
-1. [API Reference](api_reference.md) - Complete API documentation
-2. [Configuration](configuration.md) - Customization options
-3. [Contributing](contributing.md) - Extending the system
+### 👤 End Users
+**Goal**: Use SubgraphRAG+ for question answering
 
-### 🍎 **For Apple Silicon Users**
-1. [Installation Guide](installation.md) - Platform-specific setup
-2. [MLX Integration](mlx.md) - Native Apple Silicon acceleration
+1. **Start here**: [Installation Guide](installation.md) → Docker Setup
+2. **Learn the API**: [API Reference](api_reference.md)
+3. **Get help**: [Troubleshooting Guide](troubleshooting.md)
 
-## 📝 Documentation Quality Standards
+### 👨‍💻 Developers  
+**Goal**: Contribute to or customize SubgraphRAG+
 
-Our documentation follows these principles:
+1. **Setup**: [Installation Guide](installation.md) → Development Setup
+2. **Understand**: [Architecture Guide](architecture.md)
+3. **Develop**: [Development Guide](development.md)
+4. **Contribute**: [Contributing Guide](contributing.md)
 
-- **🎯 Practical**: All examples are tested and working
-- **📋 Complete**: Step-by-step instructions with expected outcomes
-- **🔄 Current**: Regular updates to match the latest codebase
-- **🧪 Verified**: Code samples are validated in CI/CD
-- **🔗 Connected**: Cross-references between related topics
+### 🚀 DevOps/Deployment
+**Goal**: Deploy SubgraphRAG+ in production
 
-## 🚦 Quick Health Check
+1. **Setup**: [Installation Guide](installation.md) → Docker Setup
+2. **Configure**: [Configuration Guide](configuration.md)
+3. **Deploy**: [Deployment Guide](deployment.md)
+4. **Monitor**: [Troubleshooting Guide](troubleshooting.md)
 
-Before diving into the documentation, verify your setup:
+### 🔬 Researchers
+**Goal**: Understand and extend the system
 
+1. **Architecture**: [Architecture Guide](architecture.md)
+2. **MLP Details**: [MLP Retriever Guide](mlp_retriever.md)
+3. **Development**: [Development Guide](development.md)
+4. **Apple Silicon**: [MLX Integration](mlx.md)
+
+---
+
+## 🏛️ System Overview
+
+SubgraphRAG+ is a sophisticated question-answering system that combines:
+
+### Core Components
+- **🧠 Knowledge Graph**: Neo4j-powered graph database
+- **🔍 Dense Retrieval**: FAISS-based vector search  
+- **🤖 MLP Scoring**: Machine learning relevance scoring
+- **🌐 REST API**: FastAPI-based web service
+- **🍎 MLX Support**: Apple Silicon optimization
+
+### Key Features
+- **Hybrid Retrieval**: Combines graph traversal with semantic search
+- **Intelligent Scoring**: ML-powered relevance ranking
+- **Streaming Responses**: Real-time answer generation
+- **Graph Visualization**: Interactive subgraph exploration
+- **Multi-Platform**: Docker, local, and Apple Silicon support
+
+### Supported Models
+- **OpenAI**: GPT-3.5/4 integration
+- **HuggingFace**: Open-source model support
+- **MLX**: Optimized Apple Silicon inference
+- **Local Models**: Self-hosted deployment options
+
+---
+
+## 🛠️ Quick Setup Commands
+
+### Docker (Recommended)
 ```bash
-# Check if the API is running
-curl http://localhost:8000/healthz
-
-# Run the test suite
-make test
-
-# Check all dependencies
-make env-check
+git clone <repository-url>
+cd SubgraphRAGPlus
+./bin/setup_docker.sh
+# Visit http://localhost:8000/docs
 ```
 
-## 🤝 Contributing to Documentation
+### Development
+```bash
+git clone <repository-url>
+cd SubgraphRAGPlus
+./bin/setup_dev.sh
+source venv/bin/activate
+make serve
+```
 
-We welcome documentation improvements! To contribute:
+### Apple Silicon (MLX)
+```bash
+./bin/setup_dev.sh  # Auto-detects Apple Silicon
+# Configure MLX in .env
+make serve
+```
 
-1. **🐛 Found an issue?** [Report it on GitHub](https://github.com/your-username/SubgraphRAGPlus/issues)
-2. **📝 Want to improve docs?** See [Contributing Guidelines](contributing.md)
-3. **💡 Have suggestions?** [Start a discussion](https://github.com/your-username/SubgraphRAGPlus/discussions)
+---
 
-## 📞 Getting Help
+## 📊 Documentation Quality
 
-- **📖 Documentation Issues**: [GitHub Issues](https://github.com/your-username/SubgraphRAGPlus/issues)
-- **🛠️ Technical Problems**: [Troubleshooting Guide](troubleshooting.md)
-- **💬 General Questions**: [GitHub Discussions](https://github.com/your-username/SubgraphRAGPlus/discussions)
+### ✅ What's Covered
+- **Complete Installation**: All platforms and methods
+- **Comprehensive API**: Every endpoint documented
+- **Troubleshooting**: Common issues and solutions
+- **Architecture**: System design and components
+- **Development**: Contributing and testing
+- **Deployment**: Production setup and scaling
+
+### 🎯 Documentation Principles
+- **User-Focused**: Organized by user goals and use cases
+- **Action-Oriented**: Clear steps and commands
+- **Comprehensive**: Covers all aspects of the system
+- **Maintained**: Kept up-to-date with code changes
+- **Accessible**: Clear language and good formatting
+
+---
+
+## 🆘 Getting Help
+
+### 📖 Self-Service
+1. **Search this documentation** for your specific issue
+2. **Check [Troubleshooting](troubleshooting.md)** for common problems
+3. **Review [API Reference](api_reference.md)** for usage questions
+
+### 🤝 Community Support
+- **🐛 Bug Reports**: [GitHub Issues](https://github.com/your-username/SubgraphRAGPlus/issues)
+- **❓ Questions**: [GitHub Discussions](https://github.com/your-username/SubgraphRAGPlus/discussions)
+- **💡 Feature Requests**: [GitHub Issues](https://github.com/your-username/SubgraphRAGPlus/issues)
+
+### 📝 Contributing to Documentation
+Found an error or want to improve the docs? See our [Contributing Guide](contributing.md) for how to submit documentation improvements.
+
+---
+
+## 🗺️ Documentation Map
+
+```
+docs/
+├── README.md                 # 👈 You are here - Main navigation
+├── installation.md           # 📦 Complete setup guide
+├── troubleshooting.md        # 🆘 Problem solving
+├── configuration.md          # ⚙️ System configuration
+├── architecture.md           # 🏛️ System design
+├── development.md            # 🔧 Development workflow
+├── contributing.md           # 🤝 Contribution guidelines
+├── api_reference.md          # 📡 API documentation
+├── deployment.md             # 🚀 Production deployment
+├── mlx.md                   # 🍎 Apple Silicon optimization
+└── mlp_retriever.md         # 🤖 MLP technical details
+```
+
+---
+
+## 🎉 What's Next?
+
+After reading this overview:
+
+1. **🚀 Get Started**: Choose your installation method in the [Installation Guide](installation.md)
+2. **🔍 Explore**: Try the API using the [API Reference](api_reference.md)
+3. **🏗️ Understand**: Learn the system architecture in the [Architecture Guide](architecture.md)
+4. **🤝 Contribute**: Join the community via the [Contributing Guide](contributing.md)
 
 ---
 
 <div align="center">
 
-**📚 Need help? Start with the [Installation Guide](installation.md) and [Development Guide](development.md)!**
+**📚 Happy Learning!**
 
-⭐ **Star this repository** if you find our documentation helpful.
+*SubgraphRAG+ Documentation - Your guide to intelligent question answering*
 
 </div> 

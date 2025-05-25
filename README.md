@@ -2,9 +2,9 @@
 
 <div align="center">
 
-![SubgraphRAG+ Logo](https://img.shields.io/badge/SubgraphRAG+-Enhanced%20Knowledge%20Graph%20QA-blue?style=for-the-badge)
+![SubgraphRAG+ Logo](https://img.shields.io/badge/SubgraphRAG+-Knowledge%20Graph%20QA-blue?style=for-the-badge&logo=neo4j&logoColor=white)
 
-**Advanced Knowledge Graph Question Answering with Hybrid Retrieval and Real-time Visualization**
+**Production-Ready Knowledge Graph Question Answering with Hybrid Retrieval**
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
@@ -12,7 +12,7 @@
 [![Neo4j](https://img.shields.io/badge/neo4j-4.4+-red.svg)](https://neo4j.com/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688.svg)](https://fastapi.tiangolo.com/)
 
-[🚀 Quick Start](#-quick-start) • [📖 Documentation](#-documentation) • [🔧 Development](#-development) • [🏢 Deployment](#-deployment) • [🤝 Contributing](#-contributing)
+[🚀 Quick Start](#-quick-start) • [📖 Documentation](#-documentation) • [🏗️ Architecture](#️-architecture) • [🤝 Contributing](#-contributing)
 
 </div>
 
@@ -20,28 +20,46 @@
 
 ## 🌟 Overview
 
-SubgraphRAG+ is a production-ready knowledge graph-powered question answering system that combines structured graph traversal with dense vector retrieval. Built on cutting-edge research, it provides accurate, contextual answers with interactive visualizations and comprehensive API features.
+SubgraphRAG+ is an advanced knowledge graph-powered question answering system that combines structured graph traversal with semantic vector search. It provides contextual answers with real-time visualizations through a production-ready REST API.
 
 ### ✨ Key Features
 
-- **🔀 Hybrid Retrieval**: Combines graph traversal and semantic search for optimal accuracy
-- **🔄 Real-time Ingestion**: Dynamic knowledge graph updates with intelligent validation
-- **📡 Streaming Responses**: Token-by-token delivery with live citations and graph data
-- **📊 Interactive Visualizations**: D3.js-compatible graph data with relevance highlighting
-- **🏢 Enterprise API**: OpenAPI 3.0 compliant with rate limiting and monitoring
-- **🧠 Multi-LLM Support**: OpenAI, HuggingFace, Anthropic, MLX (Apple Silicon), and local model compatibility
-- **⚡ High Performance**: FAISS indexing, Neo4j optimization, and intelligent caching
-- **🔒 Production Ready**: Docker deployment, health checks, metrics, and comprehensive logging
+- **🔀 Hybrid Retrieval**: Combines Neo4j graph traversal with FAISS vector search
+- **🔄 Real-time Ingestion**: Dynamic knowledge graph updates with validation
+- **📡 Streaming API**: Server-sent events with live citations and graph data  
+- **📊 Interactive Visualization**: D3.js-compatible graph data with relevance scoring
+- **🧠 Multi-LLM Support**: OpenAI, HuggingFace, Anthropic, MLX (Apple Silicon)
+- **⚡ High Performance**: Optimized with caching, indexing, and MLP scoring
+- **🏢 Production Ready**: Docker deployment, monitoring, health checks
+
+### 🏗️ Architecture
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   FastAPI       │    │  Hybrid         │    │  Knowledge      │
+│   REST API      │───▶│  Retriever      │───▶│  Graph (Neo4j)  │
+│                 │    │                 │    │                 │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+         │                       │                       │
+         │                       ▼                       │
+         │              ┌─────────────────┐              │
+         │              │  Vector Index   │              │
+         ▼              │  (FAISS)        │              ▼
+┌─────────────────┐    └─────────────────┘    ┌─────────────────┐
+│   LLM Backend   │                           │  MLP Scoring    │
+│  (OpenAI/HF/MLX)│                           │  Model          │
+└─────────────────┘                           └─────────────────┘
+```
+
+---
 
 ## 🚀 Quick Start
 
-Choose your preferred setup method:
+Choose your setup method based on your needs:
 
-### 🐳 Docker Setup (Recommended for Production)
+### 🐳 Production Setup (Docker - Recommended)
 
-**Prerequisites:**
-- Docker Engine 20.10+ with Docker Compose v2
-- 4GB+ RAM, 10GB+ free disk space
+**For production deployments and users who want everything set up automatically:**
 
 ```bash
 # Clone the repository
@@ -49,242 +67,324 @@ git clone https://github.com/your-username/SubgraphRAGPlus.git
 cd SubgraphRAGPlus
 
 # One-command setup and start
-make setup-all
+./bin/setup_docker.sh
 
-# Verify installation
+# Verify it's working
 curl -X POST "http://localhost:8000/query" \
-  -H "X-API-KEY: your-api-key" \
+  -H "X-API-KEY: default_key_for_dev_only" \
   -H "Content-Type: application/json" \
   -d '{"question": "What is artificial intelligence?", "visualize_graph": true}'
 ```
 
-### 🐍 Local Development Setup (Recommended for Development)
+### 🔧 Development Setup (Local)
 
-**Prerequisites:**
-- Python 3.9+ (tested up to Python 3.13)
-- Git
+**For developers who want to modify code or contribute:**
 
 ```bash
 # Clone the repository
 git clone https://github.com/your-username/SubgraphRAGPlus.git
 cd SubgraphRAGPlus
 
-# Interactive setup (recommended - handles everything automatically)
-make setup-dev
+# Interactive development setup (recommended)
+./bin/setup_dev.sh
 
-# Alternative: Use the setup script directly with options
-./bin/setup_dev.sh --help  # See all options
+# The script will guide you through:
+# - Python environment setup
+# - Dependency installation  
+# - Neo4j configuration
+# - Sample data loading
+# - Configuration files
 
-# Quick non-interactive setup (skips tests and sample data)
-make setup-dev-quick
+# Start the development server
+source venv/bin/activate
+python src/main.py --reload
 ```
 
-The setup script will:
-- ✅ Detect and validate your Python version
-- ✅ Create and configure a virtual environment
-- ✅ Install all dependencies
-- ✅ Set up Neo4j (Docker or local)
-- ✅ Create configuration files
-- ✅ Initialize database schema
-- ✅ Load sample data (optional)
-- ✅ Run tests (optional)
+### ⚡ Quick Setup Commands
 
-> **🍎 Apple Silicon Users**: For optimized performance on M1/M2/M3 Macs, see [MLX Installation Guide](docs/installation.md#-mlx-installation-apple-silicon) to enable native Apple Silicon acceleration.
-
-### 🐍 Quick Validation
-
-After setup, verify your installation:
+**If you prefer using make commands:**
 
 ```bash
-# Health check
-curl http://localhost:8000/healthz
+# Development environment
+make setup-dev          # Uses bin/setup_dev.sh internally
 
-# API documentation
-open http://localhost:8000/docs  # macOS
-# or visit http://localhost:8000/docs in your browser
+# Docker environment  
+make setup-all          # Uses bin/setup_docker.sh internally
+
+# Individual components
+make neo4j-start        # Start just Neo4j
+make serve              # Start development server
+make test               # Run test suite
 ```
+
+> **💡 Setup Method Guide**: 
+> - **`./bin/` scripts** → Interactive setup with user prompts and error handling
+> - **`make` commands** → Automated workflows for CI/CD and quick operations
+> - Use **bin scripts** for initial setup, **make** for daily development
+
+---
 
 ## 📖 Documentation
 
-| Document | Purpose | Audience |
-|----------|---------|----------|
-| [🏗️ Architecture Guide](docs/architecture.md) | System design and components | Developers, Architects |
-| [🔧 Development Guide](docs/development.md) | Local development setup | Contributors, Developers |
-| [🚀 Deployment Guide](docs/deployment.md) | Production deployment | DevOps, System Admins |
-| [📡 API Reference](docs/api_reference.md) | Complete API documentation | API Consumers, Integrators |
+| Document | Description | Audience |
+|----------|-------------|----------|
+| **[📚 Documentation Hub](docs/README.md)** | Complete documentation index | All users |
+| **[🛠️ Installation Guide](docs/installation.md)** | Detailed setup instructions | New users |
+| **[🏗️ Architecture Guide](docs/architecture.md)** | System design and components | Developers, Architects |
+| **[🔧 Development Guide](docs/development.md)** | Contributing and local dev | Contributors |
+| **[🚀 Deployment Guide](docs/deployment.md)** | Production deployment | DevOps, SysAdmins |
+| **[📡 API Reference](docs/api_reference.md)** | Complete API documentation | Integrators |
+| **[🔧 Configuration](docs/configuration.md)** | Settings and environment vars | All users |
+| **[🩺 Troubleshooting](docs/troubleshooting.md)** | Common issues and solutions | All users |
+
+### 🍎 Apple Silicon Users
+
+For optimized performance on M1/M2/M3 Macs:
+- See **[MLX Integration Guide](docs/mlx.md)** for native Apple Silicon acceleration
+- Use `./bin/setup_dev.sh` which auto-detects and configures MLX
+
+---
 
 ## 🛠️ System Requirements
 
 ### Minimum Requirements
-- **CPU**: 2 cores
-- **RAM**: 4GB
-- **Storage**: 10GB free space
 - **OS**: Linux, macOS, or Windows with WSL2
+- **Python**: 3.9+ (tested up to 3.13)
+- **Memory**: 4GB RAM
+- **Storage**: 10GB free space
+- **Docker**: 20.10+ with Compose v2 (for Docker setup)
 
 ### Recommended for Production
 - **CPU**: 4+ cores
-- **RAM**: 8GB+
+- **Memory**: 8GB+ RAM  
 - **Storage**: 50GB+ SSD
-- **Network**: Stable internet connection
+- **Network**: Stable internet connection for LLM APIs
 
-## 🔧 Development
+---
 
-### Development Commands
-
-```bash
-# Setup commands
-make setup-dev          # Full interactive development setup
-make setup-dev-quick    # Quick non-interactive setup
-make setup-all          # Docker-based setup
-
-# Development server
-make serve              # Start development server
-make test               # Run comprehensive tests
-make lint               # Check code quality
-make format             # Auto-format code
-
-# Database operations
-make neo4j-start        # Start Neo4j container
-make migrate-schema     # Apply database migrations
-make ingest-sample      # Load sample data
-
-# Maintenance
-make clean              # Remove temporary files
-make docker-logs        # View service logs
-```
-
-### Project Structure
-
-```
-SubgraphRAG+/
-├── 📁 src/                     # Application source code
-│   ├── 📄 main.py             # Application entry point
-│   └── 📁 app/                # Core application modules
-├── 📁 bin/                     # Executable scripts
-├── 📁 scripts/                 # Python utilities
-├── 📁 deployment/              # Docker and infrastructure
-├── 📁 tests/                   # Comprehensive test suite
-├── 📁 docs/                    # Documentation
-├── 📁 config/                  # Configuration files
-├── 📄 Makefile                 # Development commands
-└── 📄 requirements.txt         # Python dependencies
-```
-
-## 🏢 Deployment
-
-### Docker Production Deployment
-
-```bash
-# Production setup
-cd deployment/
-docker-compose -f docker-compose.prod.yml up -d
-
-# Scale services
-docker-compose -f docker-compose.prod.yml up -d --scale api=3
-```
-
-### Environment Configuration
-
-Essential environment variables:
-
-```bash
-# Core settings
-NEO4J_URI=neo4j://localhost:7687
-NEO4J_USER=neo4j
-NEO4J_PASSWORD=your-secure-password
-API_KEY_SECRET=your-secret-key
-
-# Optional: OpenAI integration
-OPENAI_API_KEY=your-openai-key
-
-# Production settings
-LOG_LEVEL=INFO
-API_RATE_LIMIT=100
-```
-
-### Health Monitoring
-
-- **Health endpoint**: `GET /healthz`
-- **Readiness endpoint**: `GET /readyz` 
-- **Metrics endpoint**: `GET /metrics`
-- **Neo4j Browser**: http://localhost:7474
-
-## 🌐 API Usage
+## 🚦 API Usage
 
 ### Basic Query
 
 ```python
 import requests
 
+# Query with graph visualization
 response = requests.post(
     "http://localhost:8000/query",
     headers={"X-API-KEY": "your-api-key"},
     json={
         "question": "What is machine learning?",
-        "visualize_graph": True
+        "visualize_graph": True,
+        "max_context_triples": 50
     }
 )
 
-# For streaming response, iterate through lines
+# Stream the response
 for line in response.iter_lines():
     if line:
-        print(line.decode('utf-8'))
+        data = json.loads(line.decode('utf-8'))
+        print(f"Type: {data['type']}, Content: {data['content']}")
 ```
 
 ### Health Check
 
-```python
-import requests
-
+```bash
 # Basic health check
-health = requests.get("http://localhost:8000/healthz")
-print(health.json())
+curl http://localhost:8000/healthz
 
-# Readiness check (with dependencies)
-readiness = requests.get("http://localhost:8000/readyz")
-print(readiness.json())
+# Comprehensive readiness check
+curl http://localhost:8000/readyz
 ```
+
+### Graph Browsing
+
+```bash
+# Browse the knowledge graph
+curl "http://localhost:8000/graph/browse?limit=100&search_term=AI" \
+  -H "X-API-KEY: your-api-key"
+```
+
+---
+
+## 🔧 Development Workflow
+
+### Daily Development Commands
+
+```bash
+# Start development server
+make serve                    # or: python src/main.py --reload
+
+# Run tests
+make test                     # Run full test suite
+make test-smoke              # Quick smoke tests
+make test-api                # API integration tests
+
+# Code quality
+make lint                     # Check code style
+make format                   # Auto-format code
+
+# Database operations
+make neo4j-start             # Start Neo4j container
+make migrate-schema          # Apply database migrations
+make ingest-sample           # Load sample data
+```
+
+### Project Structure
+
+```
+SubgraphRAGPlus/
+├── 📁 src/                   # Application source code
+│   ├── 📄 main.py           # Application entry point
+│   └── 📁 app/              # Core application modules
+│       ├── 📄 api.py        # FastAPI REST endpoints
+│       ├── 📄 retriever.py  # Hybrid retrieval engine
+│       ├── 📄 database.py   # Neo4j & SQLite connections
+│       └── 📁 ml/           # ML models (LLM, embeddings, MLP)
+├── 📁 bin/                  # Setup and utility scripts
+├── 📁 scripts/              # Python utilities and tools
+├── 📁 tests/                # Comprehensive test suite
+├── 📁 docs/                 # Documentation
+├── 📁 config/               # Configuration files
+├── 📁 deployment/           # Docker and infrastructure
+├── 📄 Makefile             # Development commands
+└── 📄 requirements.txt     # Python dependencies
+```
+
+---
+
+## 🏢 Production Deployment
+
+### Docker Production
+
+```bash
+# Production deployment
+cd deployment/
+docker-compose -f docker-compose.prod.yml up -d
+
+# Scale API instances
+docker-compose -f docker-compose.prod.yml up -d --scale api=3
+
+# Monitor services
+docker-compose -f docker-compose.prod.yml logs -f
+```
+
+### Environment Configuration
+
+Essential production environment variables:
+
+```bash
+# Core database settings
+NEO4J_URI=neo4j://localhost:7687
+NEO4J_USER=neo4j
+NEO4J_PASSWORD=your-secure-production-password
+
+# API security
+API_KEY_SECRET=your-secure-api-key
+
+# LLM backend (choose one)
+OPENAI_API_KEY=your-openai-key
+# or configure HuggingFace/MLX in config.json
+
+# Production settings
+LOG_LEVEL=INFO
+API_RATE_LIMIT=100
+WORKERS=4
+```
+
+### Monitoring Endpoints
+
+- **Health Check**: `GET /healthz` - Basic liveness probe
+- **Readiness Check**: `GET /readyz` - Dependency health with detailed status
+- **Metrics**: `GET /metrics` - Prometheus-compatible metrics
+- **API Docs**: `GET /docs` - Interactive OpenAPI documentation
+- **Neo4j Browser**: http://localhost:7474 - Database management interface
+
+---
+
+## 🧪 Testing
+
+### Running Tests
+
+```bash
+# Full test suite
+make test
+
+# Specific test categories
+python -m pytest tests/test_api.py -v          # API tests
+python -m pytest tests/test_retriever.py -v    # Retrieval tests
+python -m pytest tests/test_mlp_model.py -v    # MLP model tests
+
+# With coverage report
+python -m pytest --cov=src tests/ --cov-report=html
+```
+
+### Test Structure
+
+- **Unit Tests**: Individual component testing
+- **Integration Tests**: Multi-component workflows
+- **API Tests**: REST endpoint validation
+- **Smoke Tests**: Basic system functionality
+- **Performance Tests**: Benchmarking and load testing
+
+---
 
 ## 🤝 Contributing
 
-We welcome contributions! Please see our [Development Guide](docs/development.md) for details.
+We welcome contributions! Here's how to get started:
 
 ### Quick Contribution Setup
 
 ```bash
-# Fork and clone your fork
+# 1. Fork and clone
 git clone https://github.com/your-username/SubgraphRAGPlus.git
 cd SubgraphRAGPlus
 
-# Setup development environment
-./bin/setup_dev.sh
+# 2. Setup development environment
+./bin/setup_dev.sh --run-tests
 
-# Create a feature branch
+# 3. Create a feature branch
 git checkout -b feature/your-feature-name
 
-# Make changes and test
+# 4. Make changes and test
 make test
 make lint
 
-# Submit a pull request
+# 5. Submit a pull request
 ```
+
+### Development Guidelines
+
+- **Code Style**: Follow PEP 8 with Black formatting
+- **Testing**: Add tests for new features
+- **Documentation**: Update docs for user-facing changes
+- **Commits**: Use conventional commit messages
+
+See **[Contributing Guide](docs/contributing.md)** for detailed information.
+
+---
 
 ## 📜 License
 
 This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
 
-## 🆘 Support
+---
+
+## 🆘 Support & Community
 
 - **🐛 Bug Reports**: [GitHub Issues](https://github.com/your-username/SubgraphRAGPlus/issues)
 - **💡 Feature Requests**: [GitHub Discussions](https://github.com/your-username/SubgraphRAGPlus/discussions)
-- **📖 Documentation**: [docs/](docs/)
-- **💬 Community**: [GitHub Discussions](https://github.com/your-username/SubgraphRAGPlus/discussions)
+- **📖 Documentation Issues**: [Create an Issue](https://github.com/your-username/SubgraphRAGPlus/issues)
+- **💬 General Questions**: [GitHub Discussions](https://github.com/your-username/SubgraphRAGPlus/discussions)
+
+---
 
 ## 🙏 Acknowledgments
 
-- Original SubgraphRAG research team
-- Neo4j and FAISS communities
-- FastAPI and Python ecosystem contributors
+- Original SubgraphRAG research by Microsoft Research
+- Neo4j and FAISS communities for graph and vector database technologies
+- FastAPI, PyTorch, and Python ecosystem contributors
+- Contributors and users of this project
 
 ---
 
@@ -292,6 +392,6 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 
 **[⭐ Star this repository](https://github.com/your-username/SubgraphRAGPlus) if you find it useful!**
 
-Made with ❤️ by the SubgraphRAG+ team
+**Made with ❤️ for the Knowledge Graph community**
 
 </div>

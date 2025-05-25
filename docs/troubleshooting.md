@@ -1,6 +1,6 @@
 # 🔧 Troubleshooting Guide
 
-This guide helps you diagnose and resolve common issues with SubgraphRAG+.
+This comprehensive guide helps you diagnose and resolve common issues with SubgraphRAG+.
 
 ## 🚨 Quick Diagnostics
 
@@ -8,30 +8,172 @@ This guide helps you diagnose and resolve common issues with SubgraphRAG+.
 
 ```bash
 # Basic system health
-curl http://localhost:8000/health
+curl http://localhost:8000/healthz
 
-# Detailed component status
-curl http://localhost:8000/health | jq '.'
+# Detailed component status (includes dependencies)
+curl http://localhost:8000/readyz
 
-# Check if services are running
+# Check if Docker services are running
 docker ps
 docker-compose ps
 
 # View recent logs
 docker-compose logs --tail=50
+
+# Quick API test
+curl -X POST "http://localhost:8000/query" \
+  -H "X-API-KEY: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{"question": "test", "visualize_graph": false}'
 ```
 
 ### Common Status Indicators
 
 | Status | Meaning | Action |
 |--------|---------|--------|
-| ✅ `"status": "healthy"` | Component working | No action needed |
+| ✅ `"status": "ok"` | Component working | No action needed |
 | ⚠️ `"status": "degraded"` | Partial functionality | Check specific component |
-| ❌ `"status": "unhealthy"` | Component failed | Follow troubleshooting steps |
+| ❌ `"status": "failed"` | Component failed | Follow troubleshooting steps |
+
+---
+
+## 🛠️ Setup & Installation Issues
+
+### Setup Script Hangs or Times Out
+
+**Symptoms:**
+- Setup script hangs at "Starting ingest worker" or model download
+- Process appears frozen for >10 minutes
+- Memory usage spikes during setup
+
+**Root Causes:**
+1. **Large model download**: The embedding model (434MB+) takes time to download
+2. **Model loading timeout**: Model initialization can take several minutes
+3. **Memory constraints**: Insufficient RAM for model loading
+4. **Configuration conflicts**: Mismatched settings between `.env` and `config.json`
+
+**Solutions:**
+
+#### Option 1: Use Setup Script Timeout (Recommended)
+```bash
+# Setup with built-in timeout protection
+./bin/setup_dev.sh --skip-tests
+
+# If it times out, manually complete:
+source venv/bin/activate
+python scripts/ingest_worker.py --process-all
+```
+
+#### Option 2: Test Components Individually
+```bash
+# Test embedder first
+source venv/bin/activate
+python scripts/test_embedder.py
+
+# Test database connections
+python -c "from src.app.database import neo4j_db, sqlite_db; print('Neo4j:', neo4j_db.verify_connectivity()); print('SQLite: OK')"
+```
+
+#### Option 3: Skip Heavy Components Initially
+```bash
+# Minimal setup first
+./bin/setup_dev.sh --skip-sample-data --skip-tests
+
+# Add components later
+make migrate-schema
+make ingest-sample
+```
+
+#### Option 4: Use Lighter Models
+Edit `.env` to use smaller models temporarily:
+```bash
+# For faster setup, use smaller embedding model
+EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
+
+# Or use OpenAI backend (no local models)
+MODEL_BACKEND=openai
+OPENAI_API_KEY=your_key_here
+```
+
+### Configuration Conflicts
+
+**Symptoms:**
+- Setup logs show conflicting backend configurations
+- Services start but API calls fail
+- Model loading errors
+
+**Solutions:**
+```bash
+# Ensure consistency between files
+# Check .env file:
+cat .env | grep MODEL_BACKEND
+
+# Check config.json:
+cat config/config.json | jq '.MODEL_BACKEND'
+
+# They should match. If not, update one:
+# Edit .env or use:
+echo 'MODEL_BACKEND=hf' >> .env
+```
+
+### Model Download Issues
+
+**Symptoms:**
+- Slow or failed model downloads
+- Timeouts during HuggingFace model loading
+- Disk space errors
+
+**Solutions:**
+```bash
+# Pre-download models manually
+pip install huggingface_hub
+huggingface-cli download sentence-transformers/all-MiniLM-L6-v2
+
+# Set custom cache directory
+export HF_HOME=/path/to/large/disk/cache
+export TRANSFORMERS_CACHE=$HF_HOME
+
+# Check available disk space
+df -h
+
+# Clean old models if needed
+rm -rf ~/.cache/huggingface
+```
+
+### Memory Issues During Setup
+
+**Symptoms:**
+- System becomes unresponsive
+- "Killed" process messages
+- Out of memory errors
+
+**Solutions:**
+```bash
+# Check system memory
+free -h
+
+# Close unnecessary applications
+# Use swap file if needed
+sudo fallocate -l 2G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+
+# Use lighter backends:
+# MLX (Apple Silicon - more memory efficient)
+USE_MLX_LLM=true
+MODEL_BACKEND=mlx
+
+# Or OpenAI (no local models)
+MODEL_BACKEND=openai
+OPENAI_API_KEY=your_key
+```
+
+---
 
 ## 🐳 Docker Issues
 
-### 1. Docker Daemon Not Running
+### Docker Daemon Not Running
 
 **Symptoms:**
 - `Cannot connect to the Docker daemon at unix:///var/run/docker.sock`
@@ -72,7 +214,7 @@ docker info
 docker info
 ```
 
-### 2. Docker Compose Issues
+### Docker Compose Issues
 
 **Symptoms:**
 - `no configuration file provided: not found`
@@ -95,7 +237,7 @@ docker-compose build --no-cache
 docker-compose up -d
 ```
 
-### 3. Port Conflicts
+### Port Conflicts
 
 **Symptoms:**
 - `Port 7474 is already allocated`
@@ -122,7 +264,7 @@ sudo kill -9 $(lsof -t -i:7474)
 # "7475:7474" instead of "7474:7474"
 ```
 
-### 4. Container Startup Issues
+### Container Startup Issues
 
 **Symptoms:**
 - Containers exit immediately
@@ -145,9 +287,11 @@ docker-compose down -v
 docker-compose up -d
 ```
 
+---
+
 ## 🐍 Python Environment Issues
 
-### 1. Module Import Errors
+### Module Import Errors
 
 **Symptoms:**
 - `ModuleNotFoundError: No module named 'app'`
@@ -165,13 +309,13 @@ pwd  # Should be in SubgraphRAGPlus root
 pip install -e .
 
 # Verify installation
-python -c "from app.api import app; print('✅ Import successful')"
+python -c "from src.app.api import app; print('✅ Import successful')"
 
 # Check Python path
 python -c "import sys; print('\n'.join(sys.path))"
 ```
 
-### 2. Virtual Environment Issues
+### Virtual Environment Issues
 
 **Symptoms:**
 - `command not found: python`
@@ -195,26 +339,29 @@ pip install -r requirements-dev.txt
 python --version  # Should be 3.9+
 ```
 
-### 3. Dependency Conflicts
+### Dependency Conflicts
 
 **Symptoms:**
-- `pip install` fails with dependency conflicts
-- `ImportError` for specific packages
+- Package version conflicts
+- `pip` installation failures
+- Import errors after installation
 
 **Solutions:**
 ```bash
-# Clear pip cache
-pip cache purge
-
-# Install with no dependencies first, then resolve
-pip install --no-deps -r requirements-dev.txt
+# Clean installation
+pip freeze > current_packages.txt
+pip uninstall -r current_packages.txt -y
 pip install -r requirements-dev.txt
 
-# Use pip-tools for clean resolution
-pip install pip-tools
-pip-compile requirements.in
-pip install -r requirements.txt
+# Check for conflicts
+pip check
+
+# Use specific versions if needed
+pip install "torch>=2.1.0,<3.0"
+pip install "transformers>=4.35.0,<5.0"
 ```
+
+---
 
 ## 🗄️ Database Issues
 
@@ -310,6 +457,8 @@ rm data/staging.db
 python scripts/stage_ingest.py --sample  # Recreates database
 ```
 
+---
+
 ## 🔌 API Issues
 
 ### 1. API Server Won't Start
@@ -378,6 +527,8 @@ docker stats
 
 # Increase timeout settings in config
 ```
+
+---
 
 ## 🧠 ML/AI Issues
 
@@ -555,6 +706,8 @@ echo "MLX_NUM_THREADS=4" >> .env
 echo "MLX_LLM_MODEL=mlx-community/Mistral-7B-Instruct-v0.2-8bit-mlx" >> .env
 ```
 
+---
+
 ## 🔧 Performance Issues
 
 ### 1. Slow Query Responses
@@ -602,6 +755,8 @@ free -h
 # Restart services to clear memory
 docker-compose restart
 ```
+
+---
 
 ## 🔄 Complete Reset Procedures
 
@@ -653,6 +808,8 @@ source venv/bin/activate
 pip install -r requirements-dev.txt
 pip install -e .
 ```
+
+---
 
 ## 📊 Diagnostic Commands
 
@@ -706,6 +863,8 @@ tar -czf debug_logs.tar.gz debug_logs/
 
 # Share debug_logs.tar.gz when reporting issues
 ```
+
+---
 
 ## 🆘 Getting Help
 
