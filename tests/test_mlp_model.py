@@ -357,7 +357,7 @@ class TestMLPEdgeCases(unittest.TestCase):
         with patch('app.retriever.mlp_model') as mock_model:
             mock_model.side_effect = RuntimeError("Empty tensor")
             
-            with patch('app.retriever.heuristic_score_indexed') as mock_heuristic:
+            with patch('app.utils.heuristic_score') as mock_heuristic:
                 mock_heuristic.return_value = 0.3
                 
                 score = mlp_score(query_emb, triple_emb, empty_dde)
@@ -373,7 +373,7 @@ class TestMLPEdgeCases(unittest.TestCase):
         with patch('app.retriever.mlp_model') as mock_model:
             mock_model.side_effect = RuntimeError("NaN values detected")
             
-            with patch('app.retriever.heuristic_score_indexed') as mock_heuristic:
+            with patch('app.utils.heuristic_score') as mock_heuristic:
                 mock_heuristic.return_value = 0.2
                 
                 score = mlp_score(nan_query_emb, inf_triple_emb, dde_features)
@@ -389,7 +389,7 @@ class TestMLPEdgeCases(unittest.TestCase):
             # Model should handle or fail gracefully
             mock_model.side_effect = RuntimeError("Input too large")
             
-            with patch('app.retriever.heuristic_score_indexed') as mock_heuristic:
+            with patch('app.utils.heuristic_score') as mock_heuristic:
                 mock_heuristic.return_value = 0.4
                 
                 score = mlp_score(query_emb, triple_emb, large_dde)
@@ -405,7 +405,7 @@ class TestMLPEdgeCases(unittest.TestCase):
             # Simulate CUDA device error
             mock_model.side_effect = RuntimeError("Expected all tensors to be on the same device")
             
-            with patch('app.retriever.heuristic_score_indexed') as mock_heuristic:
+            with patch('app.utils.heuristic_score') as mock_heuristic:
                 mock_heuristic.return_value = 0.35
                 
                 score = mlp_score(query_emb, triple_emb, dde_features)

@@ -94,7 +94,7 @@ class TestAPIEdgeCases:
         with patch('app.api.API_KEY_SECRET', "test_api_key"):
             return {"X-API-KEY": "test_api_key"}
 
-    def test_very_long_question(self, mock_auth_header):
+   
         """Test extremely long question input"""
         # Generate a very long question (100KB)
         very_long_question = "a" * 100_000

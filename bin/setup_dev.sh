@@ -28,6 +28,7 @@ SKIP_NEO4J=false
 SKIP_SAMPLE_DATA=false
 PYTHON_PREFERRED_VERSION=""
 USE_LOCAL_NEO4J=false
+USE_DOCKER=false
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -56,6 +57,10 @@ while [[ $# -gt 0 ]]; do
       USE_LOCAL_NEO4J=true
       shift
       ;;
+    --use-docker)
+      USE_DOCKER=true
+      shift
+      ;;
     -h|--help)
       echo "Usage: ./bin/setup_dev.sh [options]"
       echo ""
@@ -67,6 +72,8 @@ while [[ $# -gt 0 ]]; do
       echo "  --python VERSION     Use specific Python version (e.g., python3.11)"
       echo "  --use-local-neo4j    Use locally installed Neo4j instead of Docker"
       echo "                       (Requires Neo4j 4.4+ with APOC plugin installed)"
+      echo "  --use-docker         Use Docker for Neo4j (will prompt if Docker issues occur)"
+      echo "                       (Default: automatically skip Docker without prompting)"
       echo "  -h, --help           Show this help message"
       exit 0
       ;;
@@ -77,6 +84,29 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+# Cross-platform timeout function
+run_with_timeout() {
+  local timeout_duration=$1
+  shift
+  local command="$@"
+  
+  # Check if we have timeout command (Linux)
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "$timeout_duration" bash -c "$command"
+    return $?
+  # Check if we have gtimeout (macOS with coreutils)
+  elif command -v gtimeout >/dev/null 2>&1; then
+    gtimeout "$timeout_duration" bash -c "$command"
+    return $?
+  else
+    # Fallback: run without timeout but with warning
+    echo -e "${YELLOW}Warning: No timeout command available. Running without timeout...${NC}"
+    echo -e "${YELLOW}If this hangs, you can manually stop it with Ctrl+C${NC}"
+    bash -c "$command"
+    return $?
+  fi
+}
 
 # Function to check and select Python version
 select_python_version() {
@@ -183,7 +213,10 @@ setup_neo4j() {
       echo -e "${YELLOW}Press any key to continue once Neo4j is installed and running...${NC}"
       read -n 1 -s
     fi
-  else
+  elif [ "$USE_DOCKER" = true ]; then
+    # Only try Docker if explicitly requested
+    echo -e "${BLUE}Using Docker for Neo4j (requested via --use-docker flag)...${NC}"
+    
     # Check if Docker is installed
     if ! command -v docker >/dev/null 2>&1; then
       echo -e "${RED}Docker is not installed. Please install Docker and try again.${NC}"
@@ -254,6 +287,15 @@ setup_neo4j() {
         echo -e "${GREEN}Neo4j container started successfully.${NC}"
       fi
     fi
+  else
+    # Default behavior: automatically skip Docker without prompting
+    echo -e "${YELLOW}Docker setup not requested (use --use-docker flag to enable Docker setup).${NC}"
+    echo -e "${YELLOW}Skipping Neo4j Docker setup. Please ensure Neo4j is available via:${NC}"
+    echo -e "• A remote Neo4j instance (update .env file with connection details)"
+    echo -e "• Local Neo4j installation (use --use-local-neo4j flag next time)"
+    echo -e "• Neo4j Aura or other cloud service"
+    echo -e ""
+    echo -e "${GREEN}Continuing setup without local Neo4j...${NC}"
   fi
 
   echo -e "${GREEN}Neo4j setup complete.${NC}"
@@ -453,7 +495,7 @@ except Exception as e:
   echo -e "${GREEN}Processing ingestion queue (this may take a few minutes on first run due to model download)...${NC}"
   
   # Add timeout to prevent hanging - 10 minutes should be enough for model download and processing
-  timeout 600 python scripts/ingest_worker.py --process-all
+  run_with_timeout 600 "python scripts/ingest_worker.py --process-all"
   INGEST_EXIT_CODE=$?
   
   if [ $INGEST_EXIT_CODE -eq 124 ]; then

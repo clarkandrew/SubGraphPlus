@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  neo4j-test:
+    image: neo4j:4.4
+    container_name: subgraphrag_neo4j_test
+    environment:
+      - NEO4J_AUTH=neo4j/testpassword
+      - NEO4J_dbms_security_procedures_unrestricted=apoc.*
+      - NEO4J_PLUGINS=["apoc"]
+    ports:
+      - "7475:7474"  # Different port to avoid conflicts
+      - "7688:7687"  # Different port to avoid conflicts
+    volumes:
+      - neo4j_test_data:/data
+    healthcheck:
+      test: ["CMD", "wget", "http://localhost:7474", "-O", "/dev/null", "-q"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 20s
+    networks:
+      - subgraphrag-test-net
+    command: ["neo4j"]
+
+  # Mock LLM service for testing
+  mock-llm:
+    image: python:3.11-slim
+    container_name: mock_llm_test
+    ports:
+      - "8001:8001"
+    networks:
+      - subgraphrag-test-net
+    command: |
+      sh -c "
+      pip install fastapi uvicorn pydantic &&
+      cat > /tmp/mock_llm.py << 'EOF'
+      from fastapi import FastAPI
+      import uvicorn
+      
+      app = FastAPI()
+      
+      @app.post('/v1/chat/completions')
+      async def mock_chat_completion(request: dict):
+          return {
+              'choices': [{
+                  'message': {
+                      'content': 'ans: Test Entity (id=test123)'
+                  }
+              }]
+          }
+      
+      @app.post('/v1/embeddings')
+      async def mock_embeddings(request: dict):
+          return {
+              'data': [{
+                  'embedding': [0.1] * 1024
+              }]
+          }
+      
+      if __name__ == '__main__':
+          uvicorn.run(app, host='0.0.0.0', port=8001)
+      EOF
+      python /tmp/mock_llm.py
+      "
+
+networks:
+  subgraphrag-test-net:
+    driver: bridge
+
+volumes:
+  neo4j_test_data: 
