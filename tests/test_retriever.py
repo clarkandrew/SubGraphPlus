@@ -21,7 +21,7 @@ class TestRetriever(unittest.TestCase):
     def test_get_triple_embedding_from_faiss(self, mock_faiss_index):
         """Test retrieving triple embedding from FAISS"""
         # Mock faiss index to return a specific vector
-        mock_vector = np.ones(384, dtype=np.float32)
+        mock_vector = np.ones(1024, dtype=np.float32)
         mock_faiss_index.get_vector.return_value = mock_vector
         
         # Test with existing triple ID
@@ -47,8 +47,8 @@ class TestRetriever(unittest.TestCase):
         mock_mlp_model.return_value.item.return_value = 0.75
         
         # Test inputs
-        query_emb = np.random.random(384)
-        triple_emb = np.random.random(384)
+        query_emb = np.random.random(1024)
+        triple_emb = np.random.random(1024)
         dde_features = [0.5, 0.3]
         
         # Call the function
@@ -67,8 +67,8 @@ class TestRetriever(unittest.TestCase):
         mock_heuristic_score.return_value = 0.6
         
         # Test inputs
-        query_emb = np.random.random(384)
-        triple_emb = np.random.random(384)
+        query_emb = np.random.random(1024)
+        triple_emb = np.random.random(1024)
         dde_features = [0.5, 0.3]
         
         # Call the function
@@ -135,7 +135,7 @@ class TestRetriever(unittest.TestCase):
         ]
         
         # Call the function
-        query_embedding = np.random.random(384)
+        query_embedding = np.random.random(1024)
         triples_data = faiss_search_triples_data(query_embedding, k=10)
         
         # Check results
@@ -169,7 +169,7 @@ class TestRetriever(unittest.TestCase):
                                       mock_get_dde, mock_embed_query):
         """Test hybrid retrieval success path"""
         # Mock function return values
-        mock_embed_query.return_value = np.random.random(384)
+        mock_embed_query.return_value = np.random.random(1024)
         mock_get_dde.return_value = {}
         
         # Create sample triples
@@ -186,7 +186,7 @@ class TestRetriever(unittest.TestCase):
         }]
         
         # Mock embedding and scoring
-        mock_get_embedding.return_value = np.random.random(384)
+        mock_get_embedding.return_value = np.random.random(1024)
         mock_extract_dde.return_value = [0.5, 0.3]
         mock_mlp_score.return_value = 0.8
         
@@ -216,7 +216,7 @@ class TestRetriever(unittest.TestCase):
                                             mock_get_dde, mock_embed_query):
         """Test hybrid retrieval with empty results"""
         # Mock functions to return empty results
-        mock_embed_query.return_value = np.random.random(384)
+        mock_embed_query.return_value = np.random.random(1024)
         mock_get_dde.return_value = {}
         mock_neo4j_get.return_value = []
         mock_faiss_search.return_value = []

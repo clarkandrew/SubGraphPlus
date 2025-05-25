@@ -7,6 +7,7 @@ import faiss
 import networkx as nx
 from typing import List, Dict, Tuple, Optional, Any, Set
 import torch
+import torch.nn as nn
 
 from app.config import config
 from app.models import Triple, RetrievalEmpty
@@ -17,7 +18,8 @@ from app.utils import (
     cosine_similarity,
     heuristic_score,
     greedy_connect_v2,
-    get_dde_for_entities
+    get_dde_for_entities,
+    heuristic_score_indexed
 )
 from app.database import neo4j_db
 
@@ -65,7 +67,7 @@ class FaissIndex:
         """Create an empty FAISS index"""
         logger.info("Creating empty FAISS index")
         # Determine dimension based on model backend
-        dim = 384  # Default for HF and MLX
+        dim = 1024  # gte-large-en-v1.5 dimension for HF and MLX
         if config.MODEL_BACKEND == "openai":
             dim = 1536
             
@@ -174,11 +176,36 @@ def get_triple_embedding_from_faiss(triple_id: str) -> np.ndarray:
     embedding = faiss_index.get_vector(triple_id)
     if embedding is None:
         # Return zero vector with appropriate dimension
-        dim = 384  # Default for HF and MLX
+        dim = 1024  # gte-large-en-v1.5 dimension for HF and MLX
         if config.MODEL_BACKEND == "openai":
             dim = 1536
         embedding = np.zeros(dim, dtype=np.float32)
     return embedding
+
+
+class SimpleMLP(nn.Module):
+    """Simple MLP for SubgraphRAG scoring"""
+    def __init__(self, input_dim=4116, hidden_dim=1024, output_dim=1):  # 1024*4 + 20 DDE features = 4116
+        super(SimpleMLP, self).__init__()
+        self.layers = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, output_dim)
+        )
+    
+    def forward(self, x):
+        return self.layers(x)
+
+
+def calculate_mlp_input_dim(embeddings, dde_features):
+    """Calculate the input dimension for MLP based on embeddings and DDE features"""
+    if embeddings is not None and len(embeddings) > 0:
+        embedding_dim = embeddings.shape[-1] if hasattr(embeddings, 'shape') else len(embeddings[0])
+    else:
+        embedding_dim = 1024  # gte-large-en-v1.5 embedding dimension
+    
+    dde_dim = len(dde_features) if dde_features else 0
+    return embedding_dim + dde_dim
 
 
 def load_pretrained_mlp():
@@ -187,7 +214,22 @@ def load_pretrained_mlp():
         mlp_path = config.MLP_MODEL_PATH
         if os.path.exists(mlp_path):
             logger.info(f"Loading pre-trained MLP from {mlp_path}")
-            return torch.load(mlp_path, map_location=torch.device('cpu'))
+            
+            # Try to load as state dict first (safer)
+            try:
+                state_dict = torch.load(mlp_path, map_location=torch.device('cpu'), weights_only=True)
+                model = SimpleMLP()
+                model.load_state_dict(state_dict)
+                return model
+            except Exception as state_dict_error:
+                # Fallback to loading full model (less safe but might be needed for older models)
+                logger.warning(f"Could not load as state dict: {state_dict_error}, trying full model load")
+                try:
+                    model = torch.load(mlp_path, map_location=torch.device('cpu'), weights_only=False)
+                    return model
+                except Exception as full_load_error:
+                    logger.warning(f"Could not load full model either: {full_load_error}")
+                    return None
         else:
             logger.warning(f"Pre-trained MLP not found at {mlp_path}")
             return None
@@ -200,29 +242,67 @@ def load_pretrained_mlp():
 mlp_model = load_pretrained_mlp()
 
 
-def mlp_score(query_embedding, triple_embedding, dde_features):
-    """Score a triple using the MLP or fallback heuristic"""
+def mlp_score(embeddings, dde_features, index):
+    """Score using the MLP or fallback heuristic
+    
+    Args:
+        embeddings: Tensor or array of embeddings
+        dde_features: Dictionary of DDE features with lists of values
+        index: Index to select which graph/triple to score
+    
+    Returns:
+        Float score
+    """
     if mlp_model is not None:
         try:
-            # Convert inputs to torch tensors
-            q_emb = torch.tensor(query_embedding, dtype=torch.float32)
-            t_emb = torch.tensor(triple_embedding, dtype=torch.float32)
-            dde_feat = torch.tensor(dde_features, dtype=torch.float32)
+            # Validate inputs
+            if embeddings is None or dde_features is None:
+                raise ValueError("Invalid inputs")
+            
+            # Get embedding for the specified index
+            if hasattr(embeddings, 'shape') and len(embeddings.shape) > 1:
+                if index >= embeddings.shape[0]:
+                    raise IndexError("Index out of bounds for embeddings")
+                embedding = embeddings[index]
+            else:
+                if index >= len(embeddings):
+                    raise IndexError("Index out of bounds for embeddings")
+                embedding = embeddings[index]
+            
+            # Extract DDE features for the specified index
+            dde_values = []
+            for feature_name in ['num_nodes', 'num_edges', 'avg_degree', 'density', 'clustering_coefficient']:
+                if feature_name in dde_features and len(dde_features[feature_name]) > index:
+                    dde_values.append(dde_features[feature_name][index])
+                else:
+                    # Fallback to heuristic if DDE features are incomplete
+                    return heuristic_score_indexed(dde_features, index)
+            
+            # Convert to torch tensors
+            emb_tensor = torch.tensor(embedding, dtype=torch.float32).flatten()
+            dde_tensor = torch.tensor(dde_values, dtype=torch.float32)
             
             # Concatenate features
-            combined = torch.cat([q_emb, t_emb, dde_feat])
+            combined = torch.cat([emb_tensor, dde_tensor])
+            
+            # Check dimension compatibility
+            expected_dim = calculate_mlp_input_dim(embeddings, dde_features)
+            if combined.shape[0] != expected_dim:
+                logger.warning(f"Dimension mismatch: expected {expected_dim}, got {combined.shape[0]}")
+                # Fallback to heuristic
+                return heuristic_score_indexed(dde_features, index)
             
             # Get score from MLP
             with torch.no_grad():
-                score = mlp_model(combined).item()
+                score = mlp_model(combined.unsqueeze(0)).item()
             
             return score
         except Exception as e:
             logger.error(f"Error in MLP scoring: {e}, falling back to heuristic")
-            return heuristic_score(query_embedding, triple_embedding, dde_features)
+            return heuristic_score_indexed(dde_features, index)
     else:
         # Fallback to heuristic scoring
-        return heuristic_score(query_embedding, triple_embedding, dde_features)
+        return heuristic_score_indexed(dde_features, index)
 
 
 def neo4j_get_neighborhood_triples(entity_ids: List[str], hops: int, limit: int) -> List[Triple]:
@@ -388,7 +468,7 @@ def hybrid_retrieve_v2(question: str, query_entities: List[str]) -> List[Triple]
         triple_dde_features = extract_dde_features_for_triple(triple, dde_map)
         
         # Score with MLP or fallback
-        score = mlp_score(q_emb, triple_embedding, triple_dde_features)
+        score = mlp_score(triple_embedding, triple_dde_features, triple.id)
         
         # Store score and triple
         scored_triples.append((score, triple))

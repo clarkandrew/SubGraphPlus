@@ -109,8 +109,8 @@ def mlx_embed(text: str) -> np.ndarray:
     hash_val = int(hashlib.md5(text.encode()).hexdigest(), 16)
     np.random.seed(hash_val)
     
-    # Generate a 384-dim embedding vector (typical for small embedding models)
-    embedding = np.random.normal(0, 1, 384).astype(np.float32)
+    # Generate a 1024-dim embedding vector (gte-large-en-v1.5 dimensions)
+    embedding = np.random.normal(0, 1, 1024).astype(np.float32)
     # Normalize to unit length
     embedding = embedding / np.linalg.norm(embedding)
     
@@ -159,11 +159,11 @@ def embed_text(text: str) -> np.ndarray:
     if not text:
         # Return zero vector with appropriate dimension based on backend
         dimensions = {
-            "mlx": 384,
-            "hf": 384,
+            "mlx": 1024,  # gte-large-en-v1.5 dimensions
+            "hf": 1024,   # gte-large-en-v1.5 dimensions
             "openai": 1536
         }
-        return np.zeros(dimensions.get(config.MODEL_BACKEND, 384)).astype(np.float32)
+        return np.zeros(dimensions.get(config.MODEL_BACKEND, 1024)).astype(np.float32)
     
     try:
         if config.MODEL_BACKEND == "mlx":
@@ -175,14 +175,14 @@ def embed_text(text: str) -> np.ndarray:
         else:
             logger.error(f"Unknown model backend: {config.MODEL_BACKEND}")
             # Default to HF if available
-            return huggingface_embed(text) if HF_AVAILABLE else np.zeros(384).astype(np.float32)
+            return huggingface_embed(text) if HF_AVAILABLE else np.zeros(1024).astype(np.float32)
     except Exception as e:
         logger.error(f"Error embedding text: {e}")
         # Return zeros as fallback
         if config.MODEL_BACKEND == "openai":
             return np.zeros(1536).astype(np.float32)
         else:
-            return np.zeros(384).astype(np.float32)
+            return np.zeros(1024).astype(np.float32)
 
 
 def embed_batch(texts: List[str]) -> np.ndarray:

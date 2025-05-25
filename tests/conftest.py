@@ -73,7 +73,7 @@ def mock_embedder():
             import hashlib
             hash_val = int(hashlib.md5(text.encode()).hexdigest(), 16)
             np.random.seed(hash_val)
-            embedding = np.random.normal(0, 1, 384).astype(np.float32)
+            embedding = np.random.normal(0, 1, 1024).astype(np.float32)
             return embedding / np.linalg.norm(embedding)
         
         mock.side_effect = fake_embed

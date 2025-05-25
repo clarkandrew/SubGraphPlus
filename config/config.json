@@ -1,5 +1,5 @@
 {
-  "MODEL_BACKEND": "openai",
+  "MODEL_BACKEND": "hf",
   "FAISS_INDEX_PATH": "data/faiss_index.bin",
   "TOKEN_BUDGET": 4000,
   "MLP_MODEL_PATH": "models/mlp/mlp.pth",

@@ -450,6 +450,50 @@ def heuristic_score(query_embedding, triple_embedding, dde_value):
     return 0.7 * cosine_sim + 0.3 * normalized_dde
 
 
+def heuristic_score_indexed(dde_features, index):
+    """Heuristic scoring function that takes DDE features and an index
+    
+    Args:
+        dde_features: Dictionary of DDE features with lists of values
+        index: Index to select which graph to score
+    
+    Returns:
+        Float score based on DDE features only
+    """
+    try:
+        if not dde_features or index < 0:
+            return 0.0
+        
+        # Extract DDE values for the specified index
+        dde_values = []
+        for feature_name in ['num_nodes', 'num_edges', 'avg_degree', 'density', 'clustering_coefficient']:
+            if feature_name in dde_features and len(dde_features[feature_name]) > index:
+                dde_values.append(dde_features[feature_name][index])
+            else:
+                return 0.0  # Return 0 if any feature is missing
+        
+        # Simple heuristic based on DDE features
+        # Normalize and combine features
+        num_nodes = dde_values[0]
+        num_edges = dde_values[1]
+        avg_degree = dde_values[2]
+        density = dde_values[3]
+        clustering_coeff = dde_values[4]
+        
+        # Simple scoring heuristic
+        # Favor graphs with moderate size and good connectivity
+        size_score = min(num_nodes / 100.0, 1.0)  # Normalize by 100 nodes
+        connectivity_score = min(avg_degree / 10.0, 1.0)  # Normalize by degree 10
+        structure_score = (density + clustering_coeff) / 2.0
+        
+        final_score = (size_score + connectivity_score + structure_score) / 3.0
+        return max(0.0, min(1.0, final_score))  # Clamp to [0, 1]
+        
+    except Exception as e:
+        logger.warning(f"Error in heuristic scoring: {e}")
+        return 0.0
+
+
 def get_score_for_triple(triple_id: str, scored_triples: List[Tuple[float, Triple]]) -> float:
     """Get the score for a triple from a list of scored triples"""
     for score, triple in scored_triples:

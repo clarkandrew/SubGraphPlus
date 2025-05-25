@@ -144,7 +144,7 @@ def merge_staged_embeddings():
 def create_new_index():
     """Create a new FAISS index"""
     # Determine dimension based on model backend
-    dim = 384  # Default for HF and MLX
+    dim = 1024  # gte-large-en-v1.5 dimension for HF and MLX
     if config.MODEL_BACKEND == "openai":
         dim = 1536
     
