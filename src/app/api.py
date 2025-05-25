@@ -108,7 +108,7 @@ async def get_api_key(request: Request, api_key: str = Depends(api_key_header)) 
         
         # Check for brute force attempts
         recent_attempts = sqlite_db.fetchall(
-            "SELECT COUNT(*) as count FROM failed_auth_attempts WHERE ip_address = ? AND attempt_time > datetime('now', '-10 minutes')",
+            "SELECT COUNT(*) as count FROM failed_auth_attempts WHERE ip_address = ? AND timestamp > datetime('now', '-10 minutes')",
             (ip_hash,)
         )
         if recent_attempts and recent_attempts[0]["count"] > 5:

@@ -4,6 +4,7 @@ import pytest
 import json
 from unittest.mock import Mock, patch
 from pathlib import Path
+import numpy as np
 
 # Add parent directory to path so test can import app modules
 sys.path.append(str(Path(__file__).parent.parent))
@@ -66,7 +67,6 @@ def mock_faiss_index():
 @pytest.fixture
 def mock_embedder():
     """Mock embedder for testing"""
-    import numpy as np
     with patch('app.ml.embedder.embed_text') as mock:
         # Generate deterministic test embeddings
         def fake_embed(text):

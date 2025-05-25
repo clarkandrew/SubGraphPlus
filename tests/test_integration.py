@@ -11,7 +11,7 @@ from pathlib import Path
 
 def setup_test_environment():
     """Set up environment variables for integration testing"""
-    # Load test environment
+    # Load test environment BEFORE any app imports
     env_vars = {
         'NEO4J_URI': 'neo4j://localhost:7688',
         'NEO4J_USER': 'neo4j', 
@@ -22,13 +22,37 @@ def setup_test_environment():
         'OPENAI_BASE_URL': 'http://localhost:8001/v1',
         'EMBEDDING_MODEL': 'Alibaba-NLP/gte-large-en-v1.5',
         'LOG_LEVEL': 'INFO',
-        'DEBUG': 'true'
+        'DEBUG': 'true',
+        'TESTING': 'true'  # Flag to indicate we're in test mode
     }
     
     # Set environment variables
     for key, value in env_vars.items():
         os.environ[key] = value
         print(f"Set {key}={value}")
+
+def check_services():
+    """Check if Docker services are running"""
+    try:
+        import requests
+        
+        # Test Neo4j
+        neo4j_response = requests.get('http://localhost:7475', timeout=5)
+        print(f"✅ Neo4j service: {neo4j_response.status_code}")
+        
+        # Test mock LLM
+        llm_response = requests.post(
+            'http://localhost:8001/v1/chat/completions',
+            json={"messages": [{"role": "user", "content": "test"}]},
+            timeout=5
+        )
+        print(f"✅ Mock LLM service: {llm_response.status_code}")
+        return True
+        
+    except Exception as e:
+        print(f"⚠️  Warning: Could not verify services: {e}")
+        print("Make sure to run: docker-compose -f docker-compose.test.yml up -d")
+        return False
 
 def run_tests(test_files=None):
     """Run the integration tests"""
@@ -51,20 +75,30 @@ def run_tests(test_files=None):
         print("-" * 40)
         
         try:
-            # Run pytest with verbose output
+            # Create a new environment with our test variables
+            test_env = os.environ.copy()
+            
+            # Run pytest with verbose output and timeout
             result = subprocess.run([
                 sys.executable, '-m', 'pytest', 
                 test_file, 
                 '-v', 
                 '--tb=short',
                 '--no-header'
-            ], capture_output=False, text=True)
+            ], 
+            capture_output=False, 
+            text=True,
+            env=test_env,
+            timeout=300  # 5 minute timeout for the entire test file
+            )
             
             if result.returncode == 0:
                 print(f"✅ {test_file} PASSED")
             else:
                 print(f"❌ {test_file} FAILED (exit code: {result.returncode})")
                 
+        except subprocess.TimeoutExpired:
+            print(f"⏰ {test_file} TIMED OUT")
         except KeyboardInterrupt:
             print(f"\n⚠️  {test_file} INTERRUPTED")
             break
@@ -75,28 +109,14 @@ if __name__ == "__main__":
     print("SubgraphRAG+ Integration Test Runner")
     print("=" * 60)
     
-    # Setup test environment
+    # Setup test environment FIRST
     setup_test_environment()
     
     # Check if Docker services are running
-    try:
-        import requests
-        
-        # Test Neo4j
-        neo4j_response = requests.get('http://localhost:7475', timeout=5)
-        print(f"✅ Neo4j service: {neo4j_response.status_code}")
-        
-        # Test mock LLM
-        llm_response = requests.post(
-            'http://localhost:8001/v1/chat/completions',
-            json={"messages": [{"role": "user", "content": "test"}]},
-            timeout=5
-        )
-        print(f"✅ Mock LLM service: {llm_response.status_code}")
-        
-    except Exception as e:
-        print(f"⚠️  Warning: Could not verify services: {e}")
-        print("Make sure to run: docker-compose -f docker-compose.test.yml up -d")
+    if not check_services():
+        print("\n❌ Services not available. Please start Docker services first:")
+        print("   docker-compose -f docker-compose.test.yml up -d")
+        sys.exit(1)
     
     # Run tests
     test_files = sys.argv[1:] if len(sys.argv) > 1 else None

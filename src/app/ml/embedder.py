@@ -36,9 +36,17 @@ def get_hf_model():
     """Get or initialize the Hugging Face model (primary)"""
     if not HF_AVAILABLE:
         raise ImportError("Sentence Transformers not available")
+    
     model_name = EMBEDDING_MODEL
+    
+    # Set up cache directory to src/models
+    cache_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'models', 'embeddings')
+    os.makedirs(cache_dir, exist_ok=True)
+    
     logger.info(f"Loading HuggingFace embedding model: {model_name}")
-    return SentenceTransformer(model_name, trust_remote_code=True)
+    logger.info(f"Using cache directory: {cache_dir}")
+    
+    return SentenceTransformer(model_name, cache_folder=cache_dir, trust_remote_code=True)
 
 
 @lru_cache(maxsize=1)

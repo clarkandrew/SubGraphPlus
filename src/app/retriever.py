@@ -174,11 +174,8 @@ def get_triple_embedding_from_faiss(triple_id: str) -> np.ndarray:
     """Get embedding for a triple from FAISS"""
     embedding = faiss_index.get_vector(triple_id)
     if embedding is None:
-        # Return zero vector with correct dimensions based on embedding model
-        from app.ml.embedder import embed_text
-        # Get the actual embedding dimension by testing with empty text
-        test_embedding = embed_text("")
-        embedding = np.zeros(test_embedding.shape[0], dtype=np.float32)
+        # Return zero vector with correct dimensions for gte-large-en-v1.5 model
+        embedding = np.zeros(1024, dtype=np.float32)
     return embedding
 
 
