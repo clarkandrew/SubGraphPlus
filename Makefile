@@ -303,6 +303,29 @@ deploy-stop: ## Production - Stop production deployment
 # Development Workflow Shortcuts
 # ============================================================================
 
+.PHONY: demo_quickstart
+demo_quickstart: ## Workflow - Complete demo setup and test query
+	@echo "🚀 Running demo quickstart..."
+	@$(VENV_PYTHON) examples/demo_quickstart.py
+
+.PHONY: get-pretrained-mlp
+get-pretrained-mlp: ## Setup - Download or create pre-trained MLP model
+	@echo "📥 Setting up pre-trained MLP model..."
+	@if [ ! -f "models/mlp_pretrained.pt" ]; then \
+		echo "Pre-trained MLP model not found. Creating placeholder..."; \
+		$(VENV_PYTHON) -c "import torch; import torch.nn as nn; \
+		class SimpleMLP(nn.Module): \
+			def __init__(self): \
+				super().__init__(); \
+				self.pred = nn.Sequential(nn.Linear(4116, 1024), nn.ReLU(), nn.Linear(1024, 1)); \
+			def forward(self, x): return self.pred(x); \
+		torch.save(SimpleMLP(), 'models/mlp_pretrained.pt')"; \
+		echo "✅ Placeholder MLP model created at models/mlp_pretrained.pt"; \
+		echo "ℹ️  For production use, train a real model using the SubgraphRAG Colab notebook"; \
+	else \
+		echo "✅ Pre-trained MLP model already exists"; \
+	fi
+
 .PHONY: dev
 dev: setup-dev neo4j-start migrate-schema serve ## Workflow - Complete development setup and start
 
