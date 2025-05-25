@@ -1,47 +1,177 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
-  "required": ["MODEL_BACKEND", "FAISS_INDEX_PATH", "TOKEN_BUDGET", "MLP_MODEL_PATH"],
+  "required": ["application", "models", "data", "retrieval"],
   "properties": {
-    "MODEL_BACKEND": {
-      "type": "string",
-      "enum": ["mlx", "openai", "hf"],
-      "description": "Model backend to use for LLM generation"
+    "application": {
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Application name"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "description": "Application version (semantic versioning)"
+        },
+        "description": {
+          "type": "string",
+          "description": "Application description"
+        }
+      }
     },
-    "FAISS_INDEX_PATH": {
-      "type": "string",
-      "description": "Path to FAISS index file"
+    "models": {
+      "type": "object",
+      "required": ["backend", "llm", "embeddings"],
+      "properties": {
+        "backend": {
+          "type": "string",
+          "enum": ["mlx", "openai", "huggingface"],
+          "description": "Primary LLM backend to use"
+        },
+        "llm": {
+          "type": "object",
+          "properties": {
+            "mlx": {
+              "type": "object",
+              "properties": {
+                "model": {"type": "string"},
+                "max_tokens": {"type": "integer", "minimum": 1},
+                "temperature": {"type": "number", "minimum": 0, "maximum": 2},
+                "top_p": {"type": "number", "minimum": 0, "maximum": 1}
+              }
+            },
+            "openai": {
+              "type": "object",
+              "properties": {
+                "model": {"type": "string"},
+                "max_tokens": {"type": "integer", "minimum": 1},
+                "temperature": {"type": "number", "minimum": 0, "maximum": 2},
+                "top_p": {"type": "number", "minimum": 0, "maximum": 1}
+              }
+            },
+            "huggingface": {
+              "type": "object",
+              "properties": {
+                "model": {"type": "string"},
+                "max_tokens": {"type": "integer", "minimum": 1},
+                "temperature": {"type": "number", "minimum": 0, "maximum": 2},
+                "top_p": {"type": "number", "minimum": 0, "maximum": 1}
+              }
+            }
+          }
+        },
+        "embeddings": {
+          "type": "object",
+          "required": ["model", "backend"],
+          "properties": {
+            "model": {
+              "type": "string",
+              "description": "Embedding model name (MUST match MLP training model)"
+            },
+            "backend": {
+              "type": "string",
+              "enum": ["transformers"],
+              "description": "Always use transformers for embeddings"
+            },
+            "cache_dir": {
+              "type": "string",
+              "description": "Directory for caching embedding models"
+            }
+          }
+        },
+        "mlp": {
+          "type": "object",
+          "properties": {
+            "model_path": {
+              "type": "string",
+              "description": "Path to pre-trained SubgraphRAG MLP model"
+            }
+          }
+        }
+      }
     },
-    "TOKEN_BUDGET": {
-      "type": "integer",
-      "minimum": 1000,
-      "description": "Maximum tokens for context window"
+    "data": {
+      "type": "object",
+      "required": ["faiss_index_path"],
+      "properties": {
+        "faiss_index_path": {
+          "type": "string",
+          "description": "Path to FAISS index file"
+        },
+        "neo4j": {
+          "type": "object",
+          "properties": {
+            "default_database": {
+              "type": "string",
+              "description": "Default Neo4j database name"
+            }
+          }
+        }
+      }
     },
-    "MLP_MODEL_PATH": {
-      "type": "string",
-      "default": "models/mlp/mlp.pth",
-      "description": "Path to pre-trained SubgraphRAG MLP model"
+    "retrieval": {
+      "type": "object",
+      "required": ["token_budget", "max_dde_hops"],
+      "properties": {
+        "token_budget": {
+          "type": "integer",
+          "minimum": 1000,
+          "description": "Maximum tokens for context window"
+        },
+        "max_dde_hops": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum number of hops for DDE encoding"
+        },
+        "similarity_threshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Minimum similarity threshold for retrieval"
+        },
+        "max_results": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum number of results to retrieve"
+        }
+      }
     },
-    "CACHE_DIR": {
-      "type": "string",
-      "default": "cache/",
-      "description": "Directory for all cached data"
+    "performance": {
+      "type": "object",
+      "properties": {
+        "cache_size": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Cache size for various components"
+        },
+        "ingest_batch_size": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Batch size for data ingestion"
+        },
+        "api_rate_limit": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "API rate limit in requests per minute"
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Timeout for API requests in seconds"
+        }
+      }
     },
-    "MAX_DDE_HOPS": {
-      "type": "integer",
-      "default": 2,
-      "description": "Maximum number of hops for DDE encoding"
-    },
-    "LOG_LEVEL": {
-      "type": "string",
-      "enum": ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-      "default": "INFO",
-      "description": "Logging level"
-    },
-    "API_RATE_LIMIT": {
-      "type": "integer",
-      "default": 60,
-      "description": "API rate limit in requests per minute"
+    "paths": {
+      "type": "object",
+      "properties": {
+        "cache_dir": {"type": "string"},
+        "models_dir": {"type": "string"},
+        "data_dir": {"type": "string"},
+        "logs_dir": {"type": "string"}
+      }
     }
   }
 }

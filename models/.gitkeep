@@ -1,0 +1,10 @@
+# This file ensures the models directory structure is preserved in git
+# 
+# Directory structure:
+# models/
+# ├── embeddings/          # HuggingFace embedding model cache
+# ├── mlp/                 # Pre-trained MLP models
+
+
+# The actual model files are excluded by .gitignore but the directory
+# structure is preserved for proper model organization. 

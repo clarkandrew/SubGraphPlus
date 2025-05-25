@@ -1,10 +1,62 @@
 {
-  "MODEL_BACKEND": "mlx",
-  "FAISS_INDEX_PATH": "data/faiss_index.bin",
-  "TOKEN_BUDGET": 4000,
-  "MLP_MODEL_PATH": "models/mlp/mlp.pth",
-  "CACHE_DIR": "cache/",
-  "MAX_DDE_HOPS": 2,
-  "LOG_LEVEL": "INFO",
-  "API_RATE_LIMIT": 60
+  "application": {
+    "name": "SubgraphRAG+",
+    "version": "1.0.0",
+    "description": "Enhanced RAG system with subgraph retrieval and multi-modal ML capabilities"
+  },
+  "models": {
+    "backend": "mlx",
+    "llm": {
+      "mlx": {
+        "model": "mlx-community/Qwen3-14B-8bit",
+        "max_tokens": 512,
+        "temperature": 0.1,
+        "top_p": 0.9
+      },
+      "openai": {
+        "model": "gpt-3.5-turbo",
+        "max_tokens": 512,
+        "temperature": 0.1,
+        "top_p": 0.9
+      },
+      "huggingface": {
+        "model": "mistralai/Mistral-7B-Instruct-v0.2",
+        "max_tokens": 512,
+        "temperature": 0.1,
+        "top_p": 0.9
+      }
+    },
+    "embeddings": {
+      "model": "Alibaba-NLP/gte-large-en-v1.5",
+      "backend": "transformers",
+      "cache_dir": "models/embeddings/"
+    },
+    "mlp": {
+      "model_path": "models/mlp/mlp.pth"
+    }
+  },
+  "data": {
+    "faiss_index_path": "data/faiss_index.bin",
+    "neo4j": {
+      "default_database": "neo4j"
+    }
+  },
+  "retrieval": {
+    "token_budget": 4000,
+    "max_dde_hops": 2,
+    "similarity_threshold": 0.7,
+    "max_results": 10
+  },
+  "performance": {
+    "cache_size": 1000,
+    "ingest_batch_size": 100,
+    "api_rate_limit": 60,
+    "timeout_seconds": 30
+  },
+  "paths": {
+    "cache_dir": "cache/",
+    "models_dir": "models/",
+    "data_dir": "data/",
+    "logs_dir": "logs/"
+  }
 }

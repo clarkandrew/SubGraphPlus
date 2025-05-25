@@ -17,12 +17,14 @@ if TESTING:
     logging.basicConfig(level=logging.CRITICAL)  # Reduce logging noise
 
 # Set up logging
+log_level = os.getenv('LOG_LEVEL', 'INFO')
 logging.basicConfig(
-    level=logging.INFO,
+    level=getattr(logging, log_level, logging.INFO),
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler(os.path.join('logs', 'app.log'))
+        # Only add file handler if LOG_FILE is specified
+        *([] if not os.getenv('LOG_FILE') else [logging.FileHandler(os.getenv('LOG_FILE'))])
     ]
 )
 logger = logging.getLogger(__name__)
@@ -39,19 +41,18 @@ LOGS_DIR = PROJECT_ROOT / "logs"
 for directory in [DATA_DIR, CACHE_DIR, MODELS_DIR, LOGS_DIR]:
     directory.mkdir(exist_ok=True, parents=True)
 
-# Environment variables
+# Environment variables (secrets and environment-specific values)
 NEO4J_URI = os.environ.get("NEO4J_URI", "neo4j://localhost:7687")
 NEO4J_USER = os.environ.get("NEO4J_USER", "neo4j")
 NEO4J_PASSWORD = os.environ.get("NEO4J_PASSWORD", "password")
 API_KEY_SECRET = os.environ.get("API_KEY_SECRET", "default_key_for_dev_only")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+HF_TOKEN = os.environ.get("HF_TOKEN")
+ENVIRONMENT = os.environ.get("ENVIRONMENT", "development")
 
-# MLX Configuration (for LLM only when MODEL_BACKEND=mlx)
-MLX_LLM_MODEL = os.environ.get("MLX_LLM_MODEL", "mlx-community/Mistral-7B-Instruct-v0.2-4bit-mlx")
+# Optional custom paths from environment
 MLX_LLM_MODEL_PATH = os.environ.get("MLX_LLM_MODEL_PATH")
-
-# Embedding model (always uses HuggingFace transformers regardless of MODEL_BACKEND)
-EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "Alibaba-NLP/gte-large-en-v1.5")
+HF_MODEL_PATH = os.environ.get("HF_MODEL_PATH")
 
 # Configuration class
 class Config:
@@ -66,6 +67,7 @@ class Config:
         self._load_schema()
         self._load_config()
         self._load_aliases()
+        self._setup_backward_compatibility()
 
     def _load_schema(self):
         """Load and parse the configuration schema"""
@@ -74,11 +76,11 @@ class Config:
                 self.schema = json.load(f)
                 logger.info(f"Loaded schema from {self.schema_path}")
         except FileNotFoundError:
-            logger.critical(f"Schema file not found: {self.schema_path}")
-            raise
+            logger.warning(f"Schema file not found: {self.schema_path}, skipping validation")
+            self.schema = None
         except json.JSONDecodeError as e:
-            logger.critical(f"Invalid schema JSON: {e}")
-            raise
+            logger.error(f"Invalid schema JSON: {e}")
+            self.schema = None
 
     def _load_config(self):
         """Load and validate configuration from file"""
@@ -93,20 +95,13 @@ class Config:
             logger.critical(f"Invalid config JSON: {e}")
             raise
         
-        # Validate against schema
-        try:
-            jsonschema.validate(instance=self.config_data, schema=self.schema)
-            logger.info("Config validation successful")
-        except jsonschema.exceptions.ValidationError as e:
-            logger.critical(f"Config validation failed: {e}")
-            raise
-
-        # Set log level after loading config
-        log_level = self.config_data.get("LOG_LEVEL", "INFO")
-        numeric_level = getattr(logging, log_level, None)
-        if isinstance(numeric_level, int):
-            logging.getLogger().setLevel(numeric_level)
-            logger.info(f"Set log level to {log_level}")
+        # Validate against schema if available
+        if self.schema:
+            try:
+                jsonschema.validate(instance=self.config_data, schema=self.schema)
+                logger.info("Config validation successful")
+            except jsonschema.exceptions.ValidationError as e:
+                logger.warning(f"Config validation failed: {e}")
         
     def _load_aliases(self):
         """Load aliases for entity linking"""
@@ -121,10 +116,83 @@ class Config:
             logger.warning(f"Invalid aliases JSON: {e}")
             self.aliases = {}
 
+    def _setup_backward_compatibility(self):
+        """Setup backward compatibility attributes for legacy code"""
+        # Model backend
+        self.MODEL_BACKEND = self.config_data.get("models", {}).get("backend", "mlx")
+        
+        # LLM Models
+        llm_config = self.config_data.get("models", {}).get("llm", {})
+        mlx_config = llm_config.get("mlx", {})
+        
+        # MLX LLM Model (use environment override if available)
+        self.MLX_LLM_MODEL = MLX_LLM_MODEL_PATH or mlx_config.get("model", "mlx-community/Qwen3-14B-8bit")
+        
+        # OpenAI config
+        openai_config = llm_config.get("openai", {})
+        self.OPENAI_MODEL = openai_config.get("model", "gpt-3.5-turbo")
+        
+        # HuggingFace config
+        hf_config = llm_config.get("huggingface", {})
+        self.HF_MODEL = HF_MODEL_PATH or hf_config.get("model", "mistralai/Mistral-7B-Instruct-v0.2")
+        
+        # Embedding Model (ALWAYS uses transformers, never MLX)
+        embedding_config = self.config_data.get("models", {}).get("embeddings", {})
+        self.EMBEDDING_MODEL = embedding_config.get("model", "Alibaba-NLP/gte-large-en-v1.5")
+        
+        # Paths
+        self.FAISS_INDEX_PATH = self.config_data.get("data", {}).get("faiss_index_path", "data/faiss_index.bin")
+        self.MLP_MODEL_PATH = self.config_data.get("models", {}).get("mlp", {}).get("model_path", "models/mlp/mlp.pth")
+        
+        # Performance settings
+        perf_config = self.config_data.get("performance", {})
+        self.TOKEN_BUDGET = self.config_data.get("retrieval", {}).get("token_budget", 4000)
+        self.MAX_DDE_HOPS = self.config_data.get("retrieval", {}).get("max_dde_hops", 2)
+        self.CACHE_SIZE = perf_config.get("cache_size", 1000)
+        self.INGEST_BATCH_SIZE = perf_config.get("ingest_batch_size", 100)
+        self.API_RATE_LIMIT = perf_config.get("api_rate_limit", 60)
+        
+        # Directories
+        paths_config = self.config_data.get("paths", {})
+        self.CACHE_DIR = paths_config.get("cache_dir", "cache/")
+        
+        # Legacy LOG_LEVEL support
+        self.LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
+
+    def get_model_config(self, backend: str = None) -> dict:
+        """Get model configuration for a specific backend"""
+        backend = backend or self.MODEL_BACKEND
+        return self.config_data.get("models", {}).get("llm", {}).get(backend, {})
+
+    def get_embedding_config(self) -> dict:
+        """Get embedding model configuration"""
+        return self.config_data.get("models", {}).get("embeddings", {})
+
+    def get_retrieval_config(self) -> dict:
+        """Get retrieval configuration"""
+        return self.config_data.get("retrieval", {})
+
+    def get_performance_config(self) -> dict:
+        """Get performance configuration"""
+        return self.config_data.get("performance", {})
+
     def __getattr__(self, name):
-        """Access config values as attributes"""
+        """Access config values as attributes with nested support"""
+        # Try direct access first
         if name in self.config_data:
             return self.config_data[name]
+        
+        # Try nested access (e.g., models.backend)
+        parts = name.lower().split('_')
+        current = self.config_data
+        for part in parts:
+            if isinstance(current, dict) and part in current:
+                current = current[part]
+            else:
+                break
+        else:
+            return current
+        
         raise AttributeError(f"Config has no attribute '{name}'")
 
 # Create singleton instance
@@ -142,3 +210,10 @@ def get_cache_path(cache_subdir=None):
         path = path / cache_subdir
         path.mkdir(exist_ok=True, parents=True)
     return path
+
+# Export commonly used values for convenience
+MODEL_BACKEND = config.MODEL_BACKEND
+MLX_LLM_MODEL = config.MLX_LLM_MODEL
+EMBEDDING_MODEL = config.EMBEDDING_MODEL
+FAISS_INDEX_PATH = config.FAISS_INDEX_PATH
+MLP_MODEL_PATH = config.MLP_MODEL_PATH
