@@ -1,8 +1,12 @@
 import re
-import logging
 from typing import Dict, List, Set, Tuple, Optional, Any
 
-logger = logging.getLogger(__name__)
+# RULE:import-rich-logger-correctly - Use centralized rich logger
+from .log import logger, log_and_print
+from rich.console import Console
+
+# Initialize rich console for pretty CLI output
+console = Console()
 
 # Regex for valid answer line
 ANSWER_LINE_REGEX = re.compile(r"^ans:\s*(.+?)\s*\(id=(\d+(?:,\s*\d+)*)\)$")

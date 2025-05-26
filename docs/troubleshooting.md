@@ -37,6 +37,130 @@ curl -X POST "http://localhost:8000/query" \
 
 ---
 
+## 🎯 Demo Script Issues
+
+### Demo Script Fails to Start
+
+**Symptoms:**
+- Demo script exits immediately
+- "Server failed to start within timeout" error
+- MLP model not found errors
+
+**Solutions:**
+
+#### Check MLP Model Path
+```bash
+# Verify MLP model exists at correct location
+ls -la models/mlp/mlp.pth
+
+# If missing, check if it's in wrong location
+find . -name "*.pth" -o -name "*mlp*"
+
+# The demo script now looks for: models/mlp/mlp.pth
+# If you have it elsewhere, move it:
+mkdir -p models/mlp/
+mv path/to/your/mlp.pth models/mlp/mlp.pth
+```
+
+#### Use Demo Skip Options
+```bash
+# Skip Neo4j if not available
+python examples/demo_quickstart.py --skip-neo4j
+
+# Skip data ingestion if already done
+python examples/demo_quickstart.py --skip-data
+
+# Minimal demo for testing
+python examples/demo_quickstart.py --skip-neo4j --skip-data --port 8001
+```
+
+#### Check Port Conflicts
+```bash
+# Check if port is already in use
+lsof -i :8000
+netstat -an | grep 8000
+
+# Use different port
+python examples/demo_quickstart.py --port 8080
+```
+
+### Demo Script Runs Slowly
+
+**Symptoms:**
+- Demo takes >5 minutes to complete
+- Long pauses with no output
+- Server startup takes forever
+
+**Solutions:**
+
+#### Use Smart Data Skipping
+```bash
+# Demo automatically skips if >50 nodes exist
+# Force skip data ingestion:
+python examples/demo_quickstart.py --skip-data
+
+# Check current data status:
+python -c "
+from src.app.database import neo4j_db
+result = neo4j_db.run_query('MATCH (n) RETURN count(n) as count')
+print(f'Current nodes: {result[0][\"count\"] if result else 0}')
+"
+```
+
+#### Monitor Progress
+The demo now shows clear progress indicators:
+- 📋 Step 1/6: Setting up environment...
+- ✅ Environment setup completed
+- 🔄 Attempt 1/10: Checking server health...
+
+If stuck at a step, check the specific component:
+
+```bash
+# If stuck at Neo4j check:
+docker ps | grep neo4j
+curl http://localhost:7474
+
+# If stuck at server startup:
+ps aux | grep uvicorn
+curl http://localhost:8000/healthz
+```
+
+### Demo Query Fails
+
+**Symptoms:**
+- Demo completes but query returns errors
+- "No knowledge graph data" responses
+- API authentication errors
+
+**Solutions:**
+
+#### Check API Key
+```bash
+# Demo generates random API key, check logs for:
+# "Generated API key: ..."
+
+# Or set your own:
+export API_KEY_SECRET=your-test-key
+python examples/demo_quickstart.py
+```
+
+#### Verify Data Ingestion
+```bash
+# Check if knowledge graph has data
+python -c "
+from src.app.database import neo4j_db
+entities = neo4j_db.run_query('MATCH (e:Entity) RETURN count(e) as count')
+rels = neo4j_db.run_query('MATCH ()-[r:REL]->() RETURN count(r) as count')
+print(f'Entities: {entities[0][\"count\"] if entities else 0}')
+print(f'Relationships: {rels[0][\"count\"] if rels else 0}')
+"
+
+# If no data, run population script:
+python scripts/populate_knowledge_graph.py
+```
+
+---
+
 ## 🛠️ Setup & Installation Issues
 
 ### Setup Script Hangs or Times Out

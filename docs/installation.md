@@ -6,6 +6,7 @@ This guide provides step-by-step instructions for installing SubgraphRAG+ on dif
 
 | Method | Best For | Time | Requirements |
 |--------|----------|------|-------------|
+| **[🎯 Quick Demo](#-quick-demo-installation)** | First-time users, evaluation | 2-5 min | Python 3.9+ |
 | **[🐳 Docker Setup](#-docker-installation-recommended)** | Production, quick start | 5-10 min | Docker |
 | **[🔧 Development Setup](#-development-installation)** | Contributors, customization | 10-15 min | Python 3.9+ |
 | **[🍎 Apple Silicon](#-apple-silicon-optimization)** | M1/M2/M3 Mac optimization | 15-20 min | macOS + Python |
@@ -35,6 +36,89 @@ This guide provides step-by-step instructions for installing SubgraphRAG+ on dif
 #### Development Method  
 - **Python**: 3.9+ (3.11+ recommended, tested up to 3.13)
 - **pip**: Latest version
+
+---
+
+## 🎯 Quick Demo Installation
+
+**Best for: First-time users who want to see SubgraphRAG+ in action immediately**
+
+This is the fastest way to get SubgraphRAG+ running with minimal setup:
+
+### Prerequisites
+- Python 3.9+ installed
+- 4GB+ RAM available
+- Internet connection for model downloads
+
+### One-Command Demo
+
+```bash
+# Clone and run demo in one command
+git clone https://github.com/your-username/SubgraphRAGPlus.git
+cd SubgraphRAGPlus
+python examples/demo_quickstart.py --help
+```
+
+### Demo Features
+
+The demo script provides:
+- **📋 Progress Indicators**: Clear step-by-step feedback
+- **⚡ Smart Performance**: Automatically skips steps if already completed
+- **🔧 Flexible Options**: Multiple configuration options
+- **💡 Helpful Errors**: Clear guidance when issues occur
+
+### Demo Options
+
+```bash
+# Full demo (recommended for first run)
+python examples/demo_quickstart.py
+
+# Quick demo (skip database setup)
+python examples/demo_quickstart.py --skip-neo4j --skip-data
+
+# Custom port (if 8000 is busy)
+python examples/demo_quickstart.py --port 8080
+
+# See all options
+python examples/demo_quickstart.py --help
+```
+
+### What the Demo Does
+
+1. **🔧 Environment Setup** (30s): Creates virtual environment and installs dependencies
+2. **🗄️ Database Check** (15s): Verifies Neo4j connection (skippable)
+3. **🧠 Model Validation** (10s): Checks for required MLP model
+4. **📥 Data Population** (60s): Loads sample knowledge graph (skippable if present)
+5. **🚀 Server Startup** (30s): Starts API server with health checks
+6. **🧪 Live Demo** (15s): Runs example query to show functionality
+
+**Total Time: 2-5 minutes** (depending on options and system speed)
+
+### Demo Troubleshooting
+
+If the demo fails, try these options:
+
+```bash
+# Skip Neo4j if you don't have it installed
+python examples/demo_quickstart.py --skip-neo4j
+
+# Skip data ingestion if it's slow
+python examples/demo_quickstart.py --skip-data
+
+# Use different port if 8000 is busy
+python examples/demo_quickstart.py --port 8001
+
+# Minimal demo for testing
+python examples/demo_quickstart.py --skip-neo4j --skip-data --port 8001
+```
+
+### After the Demo
+
+Once the demo completes successfully, you can:
+- **Explore the API**: Visit http://localhost:8000/docs
+- **Try queries**: Use the interactive API documentation
+- **Set up full installation**: Follow the Docker or Development setup below
+- **Read documentation**: Check out the [Architecture Guide](architecture.md)
 
 ---
 

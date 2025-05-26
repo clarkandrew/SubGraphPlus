@@ -4,7 +4,6 @@ Provides proper triple extraction for SubgraphRAG+ ingestion pipeline
 """
 
 import re
-import logging
 from typing import List, Dict, Tuple, Optional
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
@@ -13,7 +12,12 @@ from transformers import AutoModelForSeq2SeqLM, AutoTokenizer, logging as transf
 # Suppress transformers warnings
 transformers_logging.set_verbosity_error()
 
-logger = logging.getLogger(__name__)
+# RULE:import-rich-logger-correctly - Use centralized rich logger
+from .log import logger, log_and_print
+from rich.console import Console
+
+# Initialize rich console for pretty CLI output
+console = Console()
 
 app = FastAPI(title="REBEL IE Service", description="Information Extraction using Babelscape/rebel-large")
 

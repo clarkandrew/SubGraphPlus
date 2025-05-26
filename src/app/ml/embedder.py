@@ -1,5 +1,4 @@
 import numpy as np
-import logging
 import os
 from typing import Dict, List, Union
 from functools import lru_cache
@@ -9,7 +8,12 @@ from app.config import config, OPENAI_API_KEY, EMBEDDING_MODEL
 # Add testing check at the top
 TESTING = os.getenv('TESTING', '').lower() in ('1', 'true', 'yes')
 
-logger = logging.getLogger(__name__)
+# RULE:import-rich-logger-correctly - Use centralized rich logger
+from ..log import logger, log_and_print
+from rich.console import Console
+
+# Initialize rich console for pretty CLI output
+console = Console()
 
 # Check for Hugging Face transformers (primary for embeddings)
 # Skip during testing to prevent slow imports

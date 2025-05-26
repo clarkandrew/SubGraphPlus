@@ -1,7 +1,6 @@
 import os
 import json
 import time
-import logging
 import numpy as np
 import faiss
 import networkx as nx
@@ -23,7 +22,12 @@ from app.utils import (
 )
 from app.database import neo4j_db
 
-logger = logging.getLogger(__name__)
+# RULE:import-rich-logger-correctly - Use centralized rich logger
+from .log import logger, log_and_print
+from rich.console import Console
+
+# Initialize rich console for pretty CLI output
+console = Console()
 
 # Constants for retrieval
 GRAPH_CANDIDATES_K = 100  # Max candidates from graph stage before MLP scoring
@@ -168,15 +172,9 @@ class FaissIndex:
             return None
 
 
-# Load MLP model (or None if not available)
-# Skip loading during testing to prevent segfaults and speed up tests
-if TESTING:
-    mlp_model = None
-    faiss_index = None
-else:
-    mlp_model = load_pretrained_mlp()
-    # Singleton instance  
-    faiss_index = FaissIndex()
+# Initialize variables - will be set after function definitions
+mlp_model = None
+faiss_index = None
 
 
 def get_triple_embedding_from_faiss(triple_id: str) -> np.ndarray:
@@ -759,3 +757,11 @@ def entity_search(search_term: str, limit: int = 10) -> List[Dict[str, Any]]:
         entities.append(entity)
     
     return entities
+
+
+# Initialize MLP model and FAISS index after all functions are defined
+# Skip loading during testing to prevent segfaults and speed up tests
+if not TESTING:
+    mlp_model = load_pretrained_mlp()
+    faiss_index = FaissIndex()
+    logger.info("Initialized MLP model and FAISS index")

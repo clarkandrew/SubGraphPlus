@@ -13,3 +13,4 @@ pytest-mock==3.11.1
 types-requests==2.31.0.2
 httpx==0.24.1
 pre-commit==3.3.3
+rich

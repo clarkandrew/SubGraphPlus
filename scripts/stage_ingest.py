@@ -1,22 +1,22 @@
 import os
 import argparse
 import csv
-import logging
 import sqlite3
+import sys
+import time
 from pathlib import Path
+
+# Add project root to path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# RULE:import-rich-logger-correctly - Use centralized rich logger
+from src.app.log import logger, log_and_print
+from rich.console import Console
 
 from app.database import sqlite_db
 
-# Set up logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler(os.path.join('logs', 'ingest.log'))
-    ]
-)
-logger = logging.getLogger(__name__)
+# Initialize rich console for pretty CLI output
+console = Console()
 
 def stage_triples_from_csv(file_path):
     """

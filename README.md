@@ -11,8 +11,10 @@
 [![Docker](https://img.shields.io/badge/docker-ready-brightgreen.svg)](https://www.docker.com/)
 [![Neo4j](https://img.shields.io/badge/neo4j-4.4+-red.svg)](https://neo4j.com/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688.svg)](https://fastapi.tiangolo.com/)
+[![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)](#-testing)
+[![Demo](https://img.shields.io/badge/demo-ready-brightgreen.svg)](#-quick-start)
 
-[🚀 Quick Start](#-quick-start) • [📖 Documentation](#-documentation) • [🏗️ Architecture](#️-architecture) • [🤝 Contributing](#-contributing)
+[🚀 Quick Start](#-quick-start) • [📖 Documentation](#-documentation) • [🏗️ Architecture](#️-architecture) • [🤝 Contributing](#-contributing) • [🎯 Demo](#-demo)
 
 </div>
 
@@ -31,6 +33,7 @@ SubgraphRAG+ is an advanced knowledge graph-powered question answering system th
 - **🧠 Multi-LLM Support**: OpenAI, HuggingFace, Anthropic, MLX (Apple Silicon)
 - **⚡ High Performance**: Optimized with caching, indexing, and MLP scoring
 - **🏢 Production Ready**: Docker deployment, monitoring, health checks
+- **🎯 Easy Demo**: One-command setup with progress indicators
 
 ### 🏗️ Architecture
 
@@ -168,6 +171,62 @@ python -m uvicorn src.app.api:app --reload --host 0.0.0.0 --port 8000
 ```
 
 The API will be available at `http://localhost:8000`
+
+## 🎯 Demo
+
+### Quick Demo (Recommended)
+
+The fastest way to see SubgraphRAG+ in action:
+
+```bash
+# Clone the repository
+git clone https://github.com/your-username/SubgraphRAGPlus.git
+cd SubgraphRAGPlus
+
+# Setup and run demo (one command!)
+./bin/setup_dev.sh --run-demo
+
+# Or run the demo script directly
+python examples/demo_quickstart.py --help
+```
+
+### Demo Features
+
+- **📋 Progress Indicators**: Clear step-by-step feedback (📋 Step 1/6, ✅ completed)
+- **⚡ Smart Performance**: Skips data ingestion if already present
+- **🔧 Flexible Options**: `--skip-neo4j`, `--skip-data`, custom ports
+- **🎯 Fast Startup**: Optimized health checks and server startup
+- **💡 Helpful Errors**: Clear guidance when things go wrong
+
+### Demo Options
+
+```bash
+# Full demo with all components
+python examples/demo_quickstart.py
+
+# Skip data ingestion if already present
+python examples/demo_quickstart.py --skip-data
+
+# Skip Neo4j for CI/testing environments
+python examples/demo_quickstart.py --skip-neo4j
+
+# Custom port
+python examples/demo_quickstart.py --port 8080
+
+# Minimal demo for quick testing
+python examples/demo_quickstart.py --skip-neo4j --skip-data --port 8001
+```
+
+### What the Demo Shows
+
+1. **🔧 Environment Setup**: Automatic dependency and configuration setup
+2. **🗄️ Database Connection**: Neo4j connectivity and schema migration
+3. **🧠 Model Loading**: MLP model detection and validation
+4. **📥 Data Ingestion**: Sample knowledge graph population (if needed)
+5. **🚀 API Server**: FastAPI server startup with health checks
+6. **🧪 Live Query**: Demonstration query with real-time response
+
+The demo provides a complete end-to-end experience in under 2 minutes!
 
 ## 📋 API Documentation
 

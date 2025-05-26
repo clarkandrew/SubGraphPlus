@@ -1,7 +1,6 @@
 import argparse
 import json
 import time
-import logging
 import csv
 import os
 import sys
@@ -13,6 +12,10 @@ from typing import List, Dict, Any, Tuple, Set, Optional
 # Add parent directory to path so we can import app modules
 sys.path.append(str(Path(__file__).parent.parent))
 
+# RULE:import-rich-logger-correctly - Use centralized rich logger
+from src.app.log import logger, log_and_print
+from rich.console import Console
+
 from app.models import QueryRequest
 from app.database import neo4j_db, sqlite_db
 from app.retriever import hybrid_retrieve_v2
@@ -20,16 +23,8 @@ from app.utils import extract_query_entities, link_entities_v2, triples_to_graph
 from app.ml.llm import generate_answer
 from app.verify import validate_llm_output
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler(os.path.join('logs', 'benchmark.log'))
-    ]
-)
-logger = logging.getLogger(__name__)
+# Initialize rich console for pretty CLI output
+console = Console()
 
 
 class BenchmarkRunner:

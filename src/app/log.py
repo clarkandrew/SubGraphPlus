@@ -5,7 +5,8 @@ from rich.console import Console
 from rich.logging import RichHandler
 from rich.theme import Theme
 from rich.rule import Rule
-from src.config import DEFAULT_OUTPUT_DIR
+# Define output directory locally to avoid circular imports
+DEFAULT_OUTPUT_DIR = "."
 from rich.markup import escape
 DEBUG_MODE = False
 # Initialize Rich Console with a theme

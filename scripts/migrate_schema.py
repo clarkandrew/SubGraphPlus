@@ -1,20 +1,20 @@
 import os
 import argparse
-import logging
+import sys
+import time
 from pathlib import Path
 from neo4j import GraphDatabase
 from neo4j.exceptions import CypherSyntaxError, ClientError
 
-# Set up logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler(os.path.join('logs', 'migration.log'))
-    ]
-)
-logger = logging.getLogger(__name__)
+# Add project root to path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# RULE:import-rich-logger-correctly - Use centralized rich logger
+from src.app.log import logger, log_and_print
+from rich.console import Console
+
+# Initialize rich console for pretty CLI output
+console = Console()
 
 def get_neo4j_connection():
     """Get a Neo4j connection from environment variables"""

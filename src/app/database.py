@@ -19,7 +19,12 @@ else:
     from app.config import config
     NEO4J_URI = NEO4J_USER = NEO4J_PASSWORD = None
 
-logger = logging.getLogger(__name__)
+# RULE:import-rich-logger-correctly - Use centralized rich logger
+from .log import logger, log_and_print
+from rich.console import Console
+
+# Initialize rich console for pretty CLI output
+console = Console()
 
 # Database paths
 SQLITE_DB_PATH = config.sqlite_db_path if hasattr(config, 'sqlite_db_path') else "data/subgraph.db"

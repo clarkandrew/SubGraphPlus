@@ -16,8 +16,12 @@ from app.config import config
 from app.models import Triple, Entity, GraphData, GraphNode, GraphLink, RetrievalEmpty, EntityLinkingError, AmbiguousEntityError
 from app.entity_typing import get_entity_type
 
-# Set up logging
-logger = logging.getLogger(__name__)
+# RULE:import-rich-logger-correctly - Use centralized rich logger
+from .log import logger, log_and_print
+from rich.console import Console
+
+# Initialize rich console for pretty CLI output
+console = Console()
 
 # Initialize TokenEncoder for counting tokens
 try:

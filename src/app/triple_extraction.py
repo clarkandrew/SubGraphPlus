@@ -4,11 +4,15 @@ Consolidates REBEL parsing logic and integrates with entity typing
 """
 
 import re
-import logging
 from typing import List, Dict, Tuple, Optional
 from dataclasses import dataclass
 
-logger = logging.getLogger(__name__)
+# RULE:import-rich-logger-correctly - Use centralized rich logger
+from .log import logger, log_and_print
+from rich.console import Console
+
+# Initialize rich console for pretty CLI output
+console = Console()
 
 @dataclass
 class Triple:

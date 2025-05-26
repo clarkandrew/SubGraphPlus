@@ -36,8 +36,12 @@ from app.verify import validate_llm_output, format_prompt
 from app.ml.embedder import health_check as embedder_health_check
 from app.ml.llm import generate_answer, stream_tokens, health_check as llm_health_check
 
-# Set up logging
-logger = logging.getLogger(__name__)
+# RULE:import-rich-logger-correctly - Use centralized rich logger
+from .log import logger, log_and_print
+from rich.console import Console
+
+# Initialize rich console for pretty CLI output
+console = Console()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

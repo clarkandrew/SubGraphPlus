@@ -16,18 +16,12 @@ DISABLE_MODELS = os.getenv('DISABLE_MODELS', '').lower() in ('1', 'true', 'yes')
 if TESTING:
     logging.basicConfig(level=logging.CRITICAL)  # Reduce logging noise
 
-# Set up logging
-log_level = os.getenv('LOG_LEVEL', 'INFO')
-logging.basicConfig(
-    level=getattr(logging, log_level, logging.INFO),
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(),
-        # Only add file handler if LOG_FILE is specified
-        *([] if not os.getenv('LOG_FILE') else [logging.FileHandler(os.getenv('LOG_FILE'))])
-    ]
-)
-logger = logging.getLogger(__name__)
+# RULE:import-rich-logger-correctly - Use centralized rich logger
+from .log import logger, log_and_print
+from rich.console import Console
+
+# Initialize rich console for pretty CLI output
+console = Console()
 
 # Base paths
 PROJECT_ROOT = Path(__file__).parent.parent.parent  # Go up from src/app/ to project root
@@ -175,6 +169,26 @@ class Config:
     def get_performance_config(self) -> dict:
         """Get performance configuration"""
         return self.config_data.get("performance", {})
+
+    def get_information_extraction_config(self) -> dict:
+        """Get information extraction model configuration"""
+        return self.config_data.get("models", {}).get("information_extraction", {})
+    
+    def get_rebel_config(self) -> dict:
+        """Get REBEL relation extraction model configuration"""
+        return self.get_information_extraction_config().get("rebel", {})
+    
+    def get_entity_typing_config(self) -> dict:
+        """Get entity typing model configuration"""
+        return self.config_data.get("models", {}).get("entity_typing", {})
+    
+    def get_ontonotes_config(self) -> dict:
+        """Get OntoNotes NER model configuration"""
+        return self.get_entity_typing_config().get("ontonotes_ner", {})
+    
+    def get_spacy_config(self) -> dict:
+        """Get spaCy fallback model configuration"""
+        return self.get_entity_typing_config().get("spacy_fallback", {})
 
     def __getattr__(self, name):
         """Access config values as attributes with nested support"""

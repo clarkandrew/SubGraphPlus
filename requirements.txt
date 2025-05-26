@@ -35,3 +35,4 @@ requests>=2.28.0
 spacy>=3.7.3
 tner>=0.0.9
 # Download spacy model: python -m spacy download en_core_web_sm
+rich

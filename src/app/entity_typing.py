@@ -5,12 +5,16 @@ Schema-first approach with offline NER fallback for robust entity classification
 
 import os
 import json
-import logging
 from functools import lru_cache
 from typing import Optional, Dict, List
 from pathlib import Path
 
-logger = logging.getLogger(__name__)
+# RULE:import-rich-logger-correctly - Use centralized rich logger
+from .log import logger, log_and_print
+from rich.console import Console
+
+# Initialize rich console for pretty CLI output
+console = Console()
 
 # Load configuration
 def load_config():
@@ -44,15 +48,30 @@ SPACY_CONFIG = CONFIG.get("models", {}).get("entity_typing", {}).get("spacy_fall
 
 # Prometheus metrics (optional)
 try:
-    from prometheus_client import Counter
-    TYPING_SOURCE = Counter(
-        "entity_typing_source_total",
-        "How entity type was resolved",
-        ["source"]
-    )
-    HAS_METRICS = True
+    from prometheus_client import Counter, CollectorRegistry, REGISTRY
+    # Check if metric already exists to avoid duplicate registration
+    try:
+        TYPING_SOURCE = Counter(
+            "entity_typing_source_total",
+            "How entity type was resolved",
+            ["source"]
+        )
+    except ValueError as e:
+        if "Duplicated timeseries" in str(e):
+            # Metric already exists, find it in the registry
+            for collector in REGISTRY._collector_to_names:
+                if hasattr(collector, '_name') and collector._name == "entity_typing_source_total":
+                    TYPING_SOURCE = collector
+                    break
+            else:
+                # If we can't find it, disable metrics
+                TYPING_SOURCE = None
+        else:
+            raise e
+    HAS_METRICS = TYPING_SOURCE is not None
 except ImportError:
     HAS_METRICS = False
+    TYPING_SOURCE = None
     logger.info("Prometheus metrics not available")
 
 @lru_cache(maxsize=1)

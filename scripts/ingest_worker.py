@@ -1,5 +1,4 @@
 import os
-import logging
 import time
 import sqlite3
 import numpy as np
@@ -8,21 +7,20 @@ import sys
 from pathlib import Path
 import argparse
 
+# Add project root to path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# RULE:import-rich-logger-correctly - Use centralized rich logger
+from src.app.log import logger, log_and_print
+from rich.console import Console
+
 from app.database import sqlite_db, neo4j_db
 from app.ml.embedder import embed_text
 from app.entity_typing import detect_entity_type, batch_detect_entity_types
-from app.utils.triple_extraction import process_rebel_output, batch_process_texts
+from app.triple_extraction import process_rebel_output, batch_process_texts
 
-# Set up logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler(os.path.join('logs', 'ingest_worker.log'))
-    ]
-)
-logger = logging.getLogger(__name__)
+# Initialize rich console for pretty CLI output
+console = Console()
 
 # Constants
 BATCH_SIZE = 100
