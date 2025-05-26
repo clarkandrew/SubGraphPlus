@@ -230,6 +230,54 @@ class LLMBackend(ABC):
 
 This modular architecture enables incremental improvements while maintaining system stability and performance.
 
+## Frontend Architecture
+
+### Next.js Web Interface
+
+SubgraphRAG+ includes a modern **Next.js 15** frontend with **shadcn/ui** components for interactive knowledge graph exploration and chat-based querying.
+
+**Key Components:**
+- **Chat Interface** (`chat-support.tsx`): Real-time conversation with SSE streaming
+- **Graph Visualization** (`data-table.tsx`): Interactive knowledge graph browser
+- **Navigation** (`app-sidebar.tsx`): Application navigation and user management
+- **Analytics Dashboard** (`chart-area-interactive.tsx`): Performance metrics and insights
+
+**Technology Stack:**
+- **Next.js 15**: React framework with App Router
+- **React 19**: Latest React features and concurrent rendering
+- **shadcn/ui**: Modern, accessible UI component library
+- **Tailwind CSS**: Utility-first CSS framework
+- **TypeScript**: Type-safe development
+
+**API Integration:**
+```typescript
+// Example API integration
+const response = await fetch('/api/query', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'X-API-Key': process.env.NEXT_PUBLIC_API_KEY
+  },
+  body: JSON.stringify({ question: userInput })
+});
+
+// Handle SSE streaming
+const reader = response.body?.getReader();
+const decoder = new TextDecoder();
+```
+
+**Real-time Features:**
+- **Server-Sent Events (SSE)**: Live streaming of query responses
+- **Progressive Loading**: Incremental content rendering
+- **Graph Updates**: Real-time visualization of retrieved subgraphs
+- **Chat History**: Persistent conversation state
+
+**Deployment Options:**
+- **Vercel**: Recommended for production deployment
+- **Docker**: Containerized deployment with backend
+- **Static Export**: Pre-built static files for CDN hosting
+- **Self-hosted**: Node.js server deployment
+
 ## Information Extraction & Entity Typing
 
 ### REBEL IE Service

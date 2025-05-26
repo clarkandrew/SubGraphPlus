@@ -188,6 +188,113 @@ All endpoints (except health/metrics) require API key authentication:
 curl -H "X-API-Key: your_api_key" http://localhost:8000/query
 ```
 
+## 🎨 Frontend Interface
+
+SubgraphRAG+ includes a modern Next.js frontend with shadcn/ui components for interactive knowledge graph exploration and chat-based querying.
+
+### Features
+
+- **💬 Interactive Chat Interface**: Real-time conversation with the knowledge graph
+- **📊 Knowledge Graph Visualization**: Interactive D3.js-powered graph exploration
+- **📈 Analytics Dashboard**: Query performance and system metrics
+- **🔍 Document Management**: Upload and manage knowledge base documents
+- **⚡ Real-time Updates**: Server-sent events for live response streaming
+- **🎨 Modern UI**: Built with Next.js 15, React 19, and Tailwind CSS
+
+### Quick Start
+
+```bash
+# Navigate to frontend directory
+cd frontend
+
+# Install dependencies
+npm install
+
+# Create environment configuration
+cp .env.local.example .env.local
+
+# Configure API endpoint
+echo "NEXT_PUBLIC_API_URL=http://localhost:8000" >> .env.local
+echo "NEXT_PUBLIC_API_KEY=your_api_key" >> .env.local
+
+# Start development server
+npm run dev
+```
+
+The frontend will be available at `http://localhost:3000`
+
+### Frontend Architecture
+
+```
+frontend/
+├── src/
+│   ├── app/                 # Next.js App Router pages
+│   ├── components/          # Reusable UI components
+│   │   ├── ui/             # shadcn/ui base components
+│   │   ├── chat-support.tsx # Chat interface
+│   │   ├── data-table.tsx  # Knowledge graph browser
+│   │   └── ...
+│   ├── hooks/              # Custom React hooks
+│   ├── lib/                # Utility functions
+│   └── util/               # Helper utilities
+├── public/                 # Static assets
+└── package.json           # Dependencies and scripts
+```
+
+### Key Components
+
+- **Chat Interface** (`chat-support.tsx`): Real-time chat with SSE streaming
+- **Graph Visualization** (`data-table.tsx`): Interactive knowledge graph browser
+- **Navigation** (`app-sidebar.tsx`): Application navigation and user management
+- **Analytics** (`chart-area-interactive.tsx`): Performance metrics and insights
+
+### Development
+
+```bash
+# Install dependencies
+npm install
+
+# Run development server with hot reload
+npm run dev
+
+# Build for production
+npm run build
+
+# Start production server
+npm start
+
+# Run linting
+npm run lint
+```
+
+### Environment Configuration
+
+Create `.env.local` with your API configuration:
+
+```bash
+# API Configuration
+NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_API_KEY=your_api_key
+
+# Optional: Analytics and monitoring
+NEXT_PUBLIC_ANALYTICS_ID=your_analytics_id
+```
+
+### Deployment
+
+The frontend can be deployed to any platform supporting Next.js:
+
+```bash
+# Build for production
+npm run build
+
+# Deploy to Vercel (recommended)
+npx vercel
+
+# Or deploy to other platforms
+npm start  # Runs production server on port 3000
+```
+
 ## ⚙️ Configuration
 
 SubgraphRAG+ uses a **clean two-tier configuration system** that separates secrets from application settings:

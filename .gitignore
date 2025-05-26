@@ -142,3 +142,45 @@ TODO.md
 models/roberta-large-ontonotes5
 TODO.md
 CHANGES.md
+
+# Frontend / Next.js specific
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.vercel/
+frontend/.turbo/
+frontend/dist/
+frontend/build/
+
+# Frontend environment files
+frontend/.env
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+
+# Frontend logs
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/pnpm-debug.log*
+
+# Frontend testing
+frontend/coverage/
+frontend/.nyc_output/
+
+# Frontend misc
+frontend/.eslintcache
+frontend/.stylelintcache
+frontend/.parcel-cache/
+frontend/.cache/
+frontend/.temp/
+frontend/.tmp/
+
+# TypeScript
+frontend/*.tsbuildinfo
+frontend/.tsbuildinfo
+
+# Storybook
+frontend/.storybook/
+frontend/storybook-static/
