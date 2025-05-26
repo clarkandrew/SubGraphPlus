@@ -130,13 +130,13 @@ def add_entity_types_to_triple(triple_dict: Dict[str, str], context: Optional[st
     Returns:
         Triple dictionary with added head_type and tail_type
     """
-    from ..entity_typing import get_entity_type
+    from app.entity_typing import get_entity_type
     
     head_context = f"Subject of {triple_dict['relation']}" if context is None else context
     tail_context = f"Object of {triple_dict['relation']}" if context is None else context
     
-    triple_dict['head_type'] = get_entity_type(triple_dict['head'], context=head_context)
-    triple_dict['tail_type'] = get_entity_type(triple_dict['tail'], context=tail_context)
+    triple_dict['head_type'] = get_entity_type(triple_dict['head'])
+    triple_dict['tail_type'] = get_entity_type(triple_dict['tail'])
     
     return triple_dict
 
@@ -254,9 +254,9 @@ def batch_process_texts(texts: List[str], ie_service_url: str, max_length: int =
                         source="rebel_ie_service"
                     )
                     # Add entity types
-                    from ..entity_typing import get_entity_type
-                    triple.head_type = get_entity_type(triple.head, context=f"Subject of {triple.relation}")
-                    triple.tail_type = get_entity_type(triple.tail, context=f"Object of {triple.relation}")
+                    from app.entity_typing import get_entity_type
+                    triple.head_type = get_entity_type(triple.head)
+                    triple.tail_type = get_entity_type(triple.tail)
                     
                     all_triples.append(triple)
                 
@@ -270,12 +270,77 @@ def batch_process_texts(texts: List[str], ie_service_url: str, max_length: int =
     logger.info(f"Batch processed {len(texts)} texts, extracted {len(all_triples)} total triples")
     return all_triples
 
-# Backward compatibility functions
 def extract_triples(text: str) -> List[Dict[str, str]]:
     """
-    DEPRECATED: Use process_rebel_output() instead
-    Maintained for backward compatibility
+    Extract triples from text using graph-based extraction
+    
+    Args:
+        text: Input text to extract triples from
+        
+    Returns:
+        List of triple dictionaries with 'head', 'relation', 'tail' keys
     """
-    logger.warning("extract_triples() is deprecated, use process_rebel_output() instead")
-    raw_triplets = extract_triplets_from_rebel(text)
-    return [clean_and_validate_triple(t) for t in raw_triplets if clean_and_validate_triple(t) is not None] 
+    from ..database import neo4j_db
+    
+    # First try REBEL extraction
+    rebel_triples = process_rebel_output(text)
+    
+    # Then enhance with graph-based extraction
+    graph_triples = []
+    
+    try:
+        with neo4j_db.get_session() as session:
+            # For each entity in the text, find its neighbors in the graph
+            for triple in rebel_triples:
+                # Look up head entity's neighbors
+                head_result = session.run(
+                    """
+                    MATCH (e:Entity) WHERE toLower(e.name) = toLower($name)
+                    MATCH (e)-[r:REL]->(neighbor:Entity)
+                    RETURN e.name as entity, type(r) as relation, neighbor.name as neighbor
+                    LIMIT 5
+                    """,
+                    {"name": triple.head}
+                )
+                
+                for record in head_result:
+                    graph_triples.append({
+                        'head': record["entity"],
+                        'relation': record["relation"],
+                        'tail': record["neighbor"]
+                    })
+                
+                # Look up tail entity's neighbors
+                tail_result = session.run(
+                    """
+                    MATCH (e:Entity) WHERE toLower(e.name) = toLower($name)
+                    MATCH (e)<-[r:REL]-(neighbor:Entity)
+                    RETURN neighbor.name as entity, type(r) as relation, e.name as neighbor
+                    LIMIT 5
+                    """,
+                    {"name": triple.tail}
+                )
+                
+                for record in tail_result:
+                    graph_triples.append({
+                        'head': record["entity"],
+                        'relation': record["relation"],
+                        'tail': record["neighbor"]
+                    })
+    
+    except Exception as e:
+        logger.warning(f"Graph-based extraction failed: {e}")
+    
+    # Combine REBEL and graph-based triples
+    all_triples = rebel_triples + graph_triples
+    
+    # Remove duplicates
+    seen = set()
+    unique_triples = []
+    for triple in all_triples:
+        key = (triple['head'], triple['relation'], triple['tail'])
+        if key not in seen:
+            seen.add(key)
+            unique_triples.append(triple)
+    
+    return unique_triples 

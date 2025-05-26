@@ -76,7 +76,7 @@ def check_neo4j():
     logger.info("Checking Neo4j connection...")
     
     sys.path.append(str(Path(__file__).parent.parent))
-    from app.database import neo4j_db
+    from src.app.database import neo4j_db
     
     try:
         neo4j_db.verify_connectivity()
@@ -129,7 +129,7 @@ def ensure_mlp_model():
         
         # Import the existing SimpleMLP class from the retriever module
         sys.path.append(str(Path(__file__).parent.parent))
-        from app.retriever import SimpleMLP
+        from src.app.retriever import SimpleMLP
         
         # Create model with standard dimensions
         model = SimpleMLP(input_dim=4116, hidden_dim=1024, output_dim=1)

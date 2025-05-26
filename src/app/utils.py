@@ -307,7 +307,7 @@ def extract_query_entities(query: str) -> List[str]:
 
 def get_dde_encoding(entity_id: str, max_hops: int = 2) -> Dict[str, List[str]]:
     """
-    Get DDE (Directional-Distance Encoding) for an entity
+    Get DDE (Directional-Distance Encoding) for an entity using graph message passing
     
     Args:
         entity_id: The entity ID
@@ -322,33 +322,43 @@ def get_dde_encoding(entity_id: str, max_hops: int = 2) -> Dict[str, List[str]]:
     if cache_key in dde_cache:
         return dde_cache[cache_key]
     
-    # Not in cache, compute DDE
+    # Not in cache, compute DDE using graph message passing
     from app.database import neo4j_db
     
-    # Use apoc.path.expandConfig to find neighbors in a BFS manner
-    query = """
-    MATCH (e:Entity {id: $entity_id})
-    CALL apoc.path.expandConfig(e, {
-        minLevel: 1,
-        maxLevel: $max_hops,
-        uniqueness: 'NODE_GLOBAL',
-        terminatorNodes: [],
-        relationshipFilter: 'REL>'
-    })
-    YIELD path
-    WITH path, length(path) as hop_distance
-    RETURN hop_distance, collect(DISTINCT last(nodes(path)).id) as entity_ids
-    ORDER BY hop_distance
-    """
+    # Initialize message passing state
+    current_layer = {entity_id}  # Start with source entity
+    visited = {entity_id}  # Track visited nodes
+    dde_encoding = {}  # Store results by hop distance
     
-    result = neo4j_db.run_query(query, {"entity_id": entity_id, "max_hops": max_hops})
-    
-    # Build DDE encoding
-    dde_encoding = {}
-    for record in result:
-        hop_distance = record["hop_distance"]
-        entity_ids = record["entity_ids"]
-        dde_encoding[f"hop{hop_distance}"] = entity_ids
+    # Message passing for each hop
+    for hop in range(1, max_hops + 1):
+        # Get neighbors of current layer
+        query = """
+        MATCH (e:Entity)
+        WHERE e.id IN $entity_ids
+        MATCH (e)-[r:REL]->(neighbor:Entity)
+        WHERE NOT neighbor.id IN $visited
+        RETURN DISTINCT neighbor.id as neighbor_id
+        """
+        
+        result = neo4j_db.run_query(query, {
+            "entity_ids": list(current_layer),
+            "visited": list(visited)
+        })
+        
+        # Update current layer with new neighbors
+        next_layer = {record["neighbor_id"] for record in result}
+        
+        # Store results for this hop
+        dde_encoding[f"hop{hop}"] = list(next_layer)
+        
+        # Update state for next iteration
+        visited.update(next_layer)
+        current_layer = next_layer
+        
+        # Early termination if no new nodes found
+        if not next_layer:
+            break
     
     # Cache the result
     dde_cache[cache_key] = dde_encoding
@@ -599,7 +609,7 @@ def triples_to_graph_data(triples: List[Triple], query_entities: List[str] = Non
             node = GraphNode(
                 id=triple.head_id,
                 name=triple.head_name,
-                type=get_entity_type(triple.head_name, context=f"Related to {triple.relation_name}"),
+                type=get_entity_type(triple.head_name),
                 relevance_score=triple.relevance_score
             )
             
@@ -614,7 +624,7 @@ def triples_to_graph_data(triples: List[Triple], query_entities: List[str] = Non
             node = GraphNode(
                 id=triple.tail_id,
                 name=triple.tail_name,
-                type=get_entity_type(triple.tail_name, context=f"Related to {triple.relation_name}"),
+                type=get_entity_type(triple.tail_name),
                 relevance_score=triple.relevance_score
             )
             
@@ -642,3 +652,91 @@ def triples_to_graph_data(triples: List[Triple], query_entities: List[str] = Non
     )
     
     return graph_data
+
+
+def extract_triples_from_text_using_graph(text: str) -> List[Dict[str, str]]:
+    """
+    Extract triples from text using graph-based extraction
+    
+    Args:
+        text: Input text to extract triples from
+        
+    Returns:
+        List of triple dictionaries with 'head', 'relation', 'tail' keys
+    """
+    from app.database import neo4j_db
+    from app.triple_extraction import process_rebel_output
+    
+    # First try REBEL extraction
+    rebel_triples = process_rebel_output(text)
+    
+    # Then enhance with graph-based extraction
+    graph_triples = []
+    
+    try:
+        with neo4j_db.get_session() as session:
+            # For each entity in the text, find its neighbors in the graph
+            for triple in rebel_triples:
+                # Look up head entity's neighbors
+                head_result = session.run(
+                    """
+                    MATCH (e:Entity) WHERE toLower(e.name) = toLower($name)
+                    MATCH (e)-[r:REL]->(neighbor:Entity)
+                    RETURN e.name as entity, type(r) as relation, neighbor.name as neighbor
+                    LIMIT 5
+                    """,
+                    {"name": triple.head}
+                )
+                
+                for record in head_result:
+                    graph_triples.append({
+                        'head': record["entity"],
+                        'relation': record["relation"],
+                        'tail': record["neighbor"]
+                    })
+                
+                # Look up tail entity's neighbors
+                tail_result = session.run(
+                    """
+                    MATCH (e:Entity) WHERE toLower(e.name) = toLower($name)
+                    MATCH (e)<-[r:REL]-(neighbor:Entity)
+                    RETURN neighbor.name as entity, type(r) as relation, e.name as neighbor
+                    LIMIT 5
+                    """,
+                    {"name": triple.tail}
+                )
+                
+                for record in tail_result:
+                    graph_triples.append({
+                        'head': record["entity"],
+                        'relation': record["relation"],
+                        'tail': record["neighbor"]
+                    })
+    
+    except Exception as e:
+        logger.warning(f"Graph-based extraction failed: {e}")
+    
+    # Combine REBEL and graph-based triples
+    all_triples = []
+    
+    # Convert REBEL triples to dict format
+    for triple in rebel_triples:
+        all_triples.append({
+            'head': triple.head,
+            'relation': triple.relation,
+            'tail': triple.tail
+        })
+    
+    # Add graph triples
+    all_triples.extend(graph_triples)
+    
+    # Remove duplicates
+    seen = set()
+    unique_triples = []
+    for triple in all_triples:
+        key = (triple['head'], triple['relation'], triple['tail'])
+        if key not in seen:
+            seen.add(key)
+            unique_triples.append(triple)
+    
+    return unique_triples

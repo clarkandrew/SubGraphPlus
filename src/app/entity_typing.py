@@ -102,7 +102,7 @@ def get_spacy_ner():
 
 def schema_type_lookup(mention: str) -> Optional[str]:
     """
-    Look up entity type from existing Neo4j graph
+    Look up entity type from existing Neo4j graph using graph-based typing
     This is the primary, authoritative source
     
     Args:
@@ -115,6 +115,7 @@ def schema_type_lookup(mention: str) -> Optional[str]:
         from .database import neo4j_db
         
         with neo4j_db.get_session() as session:
+            # First try direct lookup
             result = session.run(
                 "MATCH (e:Entity {name: $mention}) RETURN e.type as type LIMIT 1",
                 {"mention": mention}
@@ -126,7 +127,7 @@ def schema_type_lookup(mention: str) -> Optional[str]:
                     TYPING_SOURCE.labels("schema").inc()
                 return record["type"]
             
-            # Also try case-insensitive lookup
+            # If not found, try case-insensitive lookup
             result = session.run(
                 "MATCH (e:Entity) WHERE toLower(e.name) = toLower($mention) RETURN e.type as type LIMIT 1",
                 {"mention": mention}
@@ -137,6 +138,51 @@ def schema_type_lookup(mention: str) -> Optional[str]:
                 if HAS_METRICS:
                     TYPING_SOURCE.labels("schema").inc()
                 return record["type"]
+            
+            # If still not found, use graph-based typing
+            # Look at the entity's neighborhood to infer type
+            result = session.run(
+                """
+                MATCH (e:Entity) WHERE toLower(e.name) = toLower($mention)
+                MATCH (e)-[r:REL]->(neighbor:Entity)
+                WITH e, collect(DISTINCT neighbor.type) as neighbor_types,
+                     collect(DISTINCT type(r)) as relation_types
+                RETURN e.type as type,
+                       neighbor_types,
+                       relation_types,
+                       size(neighbor_types) as num_neighbors
+                LIMIT 1
+                """,
+                {"mention": mention}
+            )
+            record = result.single()
+            if record:
+                # If entity has a type, use it
+                if record["type"]:
+                    logger.debug(f"Graph-based typing hit (direct): {mention} -> {record['type']}")
+                    if HAS_METRICS:
+                        TYPING_SOURCE.labels("graph_direct").inc()
+                    return record["type"]
+                
+                # Otherwise, infer type from neighborhood
+                neighbor_types = record["neighbor_types"]
+                relation_types = record["relation_types"]
+                num_neighbors = record["num_neighbors"]
+                
+                if num_neighbors > 0:
+                    # Count type frequencies
+                    type_counts = {}
+                    for t in neighbor_types:
+                        if t:
+                            type_counts[t] = type_counts.get(t, 0) + 1
+                    
+                    # Get most common type
+                    if type_counts:
+                        most_common_type = max(type_counts.items(), key=lambda x: x[1])[0]
+                        logger.debug(f"Graph-based typing hit (inferred): {mention} -> {most_common_type}")
+                        if HAS_METRICS:
+                            TYPING_SOURCE.labels("graph_inferred").inc()
+                        return most_common_type
                 
     except Exception as e:
         logger.warning(f"Schema lookup failed for '{mention}': {e}")

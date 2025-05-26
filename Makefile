@@ -311,20 +311,7 @@ demo_quickstart: ## Workflow - Complete demo setup and test query
 .PHONY: get-pretrained-mlp
 get-pretrained-mlp: ## Setup - Download or create pre-trained MLP model
 	@echo "📥 Setting up pre-trained MLP model..."
-	@if [ ! -f "models/mlp_pretrained.pt" ]; then \
-		echo "Pre-trained MLP model not found. Creating placeholder..."; \
-		$(VENV_PYTHON) -c "import torch; import torch.nn as nn; \
-		class SimpleMLP(nn.Module): \
-			def __init__(self): \
-				super().__init__(); \
-				self.pred = nn.Sequential(nn.Linear(4116, 1024), nn.ReLU(), nn.Linear(1024, 1)); \
-			def forward(self, x): return self.pred(x); \
-		torch.save(SimpleMLP(), 'models/mlp_pretrained.pt')"; \
-		echo "✅ Placeholder MLP model created at models/mlp_pretrained.pt"; \
-		echo "ℹ️  For production use, train a real model using the SubgraphRAG Colab notebook"; \
-	else \
-		echo "✅ Pre-trained MLP model already exists"; \
-	fi
+	@$(VENV_PYTHON) scripts/get_pretrained_mlp.py --verify
 
 .PHONY: ner-model
 ner-model: ## Setup - Download models for entity typing and information extraction
