@@ -9,9 +9,10 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 from app.utils import (
     count_tokens, triple_to_string, hash_text, cosine_similarity, 
-    detect_type, normalize_dde_value, heuristic_score, 
+    normalize_dde_value, heuristic_score, 
     get_score_for_triple, greedy_connect_v2, triples_to_graph_data
 )
+from app.entity_typing import get_entity_type
 from app.models import Triple
 
 
@@ -83,22 +84,28 @@ class TestUtilsFunctions(unittest.TestCase):
         self.assertEqual(cosine_similarity(vec1, None), 0.0)
         self.assertEqual(cosine_similarity(np.zeros(3), vec2), 0.0)
     
-    def test_detect_type(self):
-        """Test entity type detection heuristic"""
+    def test_entity_type_detection(self):
+        """Test entity type detection using new schema-driven approach"""
         # Person detection
-        self.assertEqual(detect_type("Mr. John Smith"), "Person")
-        self.assertEqual(detect_type("Dr. Jane Doe"), "Person")
+        self.assertEqual(get_entity_type("Mr. John Smith"), "Person")
+        self.assertEqual(get_entity_type("Dr. Jane Doe"), "Person")
+        self.assertEqual(get_entity_type("Moses"), "Person")  # Should work with Biblical names
         
         # Organization detection
-        self.assertEqual(detect_type("Acme Corp."), "Organization")
-        self.assertEqual(detect_type("Tesla Inc."), "Organization")
+        self.assertEqual(get_entity_type("Acme Corp."), "Organization")
+        self.assertEqual(get_entity_type("Tesla Inc."), "Organization")
         
         # Location detection
-        self.assertEqual(detect_type("New York City"), "Location")
-        self.assertEqual(detect_type("Pacific Ocean"), "Location")
+        self.assertEqual(get_entity_type("New York City"), "Location")
+        self.assertEqual(get_entity_type("Pacific Ocean"), "Location")
+        self.assertEqual(get_entity_type("Jerusalem"), "Location")  # Biblical location
         
         # Default type
-        self.assertEqual(detect_type("Something else"), "Entity")
+        self.assertEqual(get_entity_type("Something else"), "Entity")
+        
+        # Test with context
+        self.assertEqual(get_entity_type("Moses", context="Moses said to the people"), "Person")
+        self.assertEqual(get_entity_type("Red Sea", context="crossed the Red Sea"), "Location")
     
     def test_normalize_dde_value(self):
         """Test DDE value normalization"""

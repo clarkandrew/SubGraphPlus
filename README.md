@@ -775,3 +775,53 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 **Made with ❤️ for the Knowledge Graph community**
 
 </div>
+
+## 🚀 Key Improvements Over Original SubgraphRAG
+
+### 1. **Production-Grade Information Extraction**
+- **REBEL IE Service**: Uses Babelscape/rebel-large for proper triple extraction from raw text
+- **Schema-Driven Entity Typing**: Replaces naive string heuristics with authoritative type mappings
+- **Domain Adaptability**: Works with Biblical text, legal documents, scientific papers, etc.
+- **Offline Operation**: No external API dependencies, fully self-contained
+
+### 2. **Dynamic Knowledge Graph Construction**
+- **Live Ingestion Pipeline**: Build KGs from any text corpus in real-time
+- **Incremental Updates**: Add new content without rebuilding entire graph
+- **Quality Control**: Deduplication, validation, and error handling
+
+### 3. **Enhanced Retrieval & Reasoning**
+- **Hybrid Retrieval**: Combines graph traversal with dense vector search
+- **MLP-Based Scoring**: Uses original SubgraphRAG MLP (no retraining needed)
+- **Budget-Aware Assembly**: Optimizes subgraph size for LLM context windows
+
+### 4. **Enterprise-Ready Architecture**
+- **Microservices**: Containerized IE service, API layer, database components
+- **Monitoring**: Health checks, metrics, logging, alerting
+- **Scalability**: Horizontal scaling, caching, batch processing
+
+## 📖 Quick Start with Biblical Text
+
+```bash
+# 1. Start the full stack
+make docker-start
+
+# 2. Start the IE service
+uvicorn src.app.ie_service:app --host 0.0.0.0 --port 8003
+
+# 3. Ingest Biblical text
+python scripts/ingest_with_ie.py data/genesis.txt
+
+# 4. Process staged triples
+python scripts/ingest_worker.py --process-all
+
+# 5. Query the knowledge graph
+curl -X POST http://localhost:8000/query \
+  -H "Content-Type: application/json" \
+  -d '{"question": "Who parted the Red Sea?"}'
+```
+
+The system will:
+1. Extract triples using REBEL: `(Moses, parted, Red Sea)`
+2. Type entities using schema: `Moses → Person, Red Sea → Location`
+3. Build knowledge graph with proper relationships
+4. Answer queries with precise citations and subgraph evidence

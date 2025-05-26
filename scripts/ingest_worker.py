@@ -10,6 +10,7 @@ import argparse
 
 from app.database import sqlite_db, neo4j_db
 from app.ml.embedder import embed_text
+from app.entity_typing import get_entity_type
 
 # Set up logging
 logging.basicConfig(
@@ -26,28 +27,6 @@ logger = logging.getLogger(__name__)
 BATCH_SIZE = 100
 MAX_RETRIES = 3
 RETRY_DELAY = 5  # seconds
-
-def detect_entity_type(name):
-    """
-    Simple heuristic for detecting entity type from name.
-    In a production system, this would be much more sophisticated.
-    """
-    name_lower = name.lower()
-    
-    # Check for people
-    if any(title in name_lower for title in ["mr.", "mrs.", "dr.", "prof.", "professor"]):
-        return "Person"
-    
-    # Check for organizations
-    if any(suffix in name_lower for suffix in ["inc.", "corp.", "llc", "ltd", "corporation", "company"]):
-        return "Organization"
-    
-    # Check for locations
-    if any(place in name_lower for place in ["city", "town", "country", "state", "province", "ocean", "sea", "river", "mountain"]):
-        return "Location"
-    
-    # Default type
-    return "Entity"
 
 def process_batch():
     """Process a batch of pending triples from staging table"""
@@ -143,7 +122,7 @@ def ingest_triple_to_neo4j(head_text, relation_text, tail_text):
         MERGE (h:Entity {name: $head_text})
         ON CREATE SET h.id = $head_id, h.type = $head_type
         RETURN h.id as head_id
-        """, head_text=head_text, head_id=str(uuid.uuid4()), head_type=detect_entity_type(head_text))
+        """, head_text=head_text, head_id=str(uuid.uuid4()), head_type=get_entity_type(head_text, context=f"Subject of {relation_text}"))
         head_id = result.single()["head_id"]
         
         # Create tail entity if it doesn't exist
@@ -151,7 +130,7 @@ def ingest_triple_to_neo4j(head_text, relation_text, tail_text):
         MERGE (t:Entity {name: $tail_text})
         ON CREATE SET t.id = $tail_id, t.type = $tail_type
         RETURN t.id as tail_id
-        """, tail_text=tail_text, tail_id=str(uuid.uuid4()), tail_type=detect_entity_type(tail_text))
+        """, tail_text=tail_text, tail_id=str(uuid.uuid4()), tail_type=get_entity_type(tail_text, context=f"Object of {relation_text}"))
         tail_id = result.single()["tail_id"]
         
         # Create relationship if it doesn't exist

@@ -1,0 +1,35 @@
+FROM python:3.9-slim
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /app
+
+# Copy requirements and install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy source code
+COPY src/ ./src/
+COPY config/ ./config/
+
+# Create cache and logs directories
+RUN mkdir -p /app/cache/transformers /app/logs
+
+# Set environment variables
+ENV PYTHONPATH=/app
+ENV TRANSFORMERS_CACHE=/app/cache/transformers
+ENV HF_HOME=/app/cache/transformers
+
+# Expose port
+EXPOSE 8003
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8003/health || exit 1
+
+# Run the IE service
+CMD ["uvicorn", "src.app.ie_service:app", "--host", "0.0.0.0", "--port", "8003"] 

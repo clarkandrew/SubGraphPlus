@@ -134,3 +134,8 @@ tools/
 models/mlp/mlp.pth
 src/models/embeddings
 models/embeddings/**
+
+ProjectPlan_dev
+.cursor
+TODO.md
+.cursorignore

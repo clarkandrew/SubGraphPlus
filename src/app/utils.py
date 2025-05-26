@@ -14,6 +14,7 @@ from diskcache import Cache
 
 from app.config import config
 from app.models import Triple, Entity, GraphData, GraphNode, GraphLink, RetrievalEmpty, EntityLinkingError, AmbiguousEntityError
+from app.entity_typing import get_entity_type
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -112,29 +113,6 @@ def cosine_similarity(vec1: np.ndarray, vec2: np.ndarray) -> float:
     if norm1 == 0 or norm2 == 0:
         return 0.0
     return np.dot(vec1, vec2) / (norm1 * norm2)
-
-
-def detect_type(text: str) -> str:
-    """
-    Simple entity type detection heuristic
-    In a production system, this would be more sophisticated
-    """
-    text_lower = text.lower()
-    
-    # Check for people
-    if any(title in text_lower for title in ["mr.", "mrs.", "dr.", "prof.", "professor"]):
-        return "Person"
-    
-    # Check for organizations
-    if any(suffix in text_lower for suffix in ["inc.", "corp.", "llc", "ltd", "corporation", "company"]):
-        return "Organization"
-    
-    # Check for locations
-    if any(place in text_lower for place in ["city", "town", "country", "state", "province", "ocean", "sea", "river", "mountain"]):
-        return "Location"
-    
-    # Default type
-    return "Entity"
 
 
 def link_entities_v2(text_mention: str, query_context: str) -> List[Tuple[str, float]]:
@@ -621,7 +599,7 @@ def triples_to_graph_data(triples: List[Triple], query_entities: List[str] = Non
             node = GraphNode(
                 id=triple.head_id,
                 name=triple.head_name,
-                type=detect_type(triple.head_name),
+                type=get_entity_type(triple.head_name, context=f"Related to {triple.relation_name}"),
                 relevance_score=triple.relevance_score
             )
             
@@ -636,7 +614,7 @@ def triples_to_graph_data(triples: List[Triple], query_entities: List[str] = Non
             node = GraphNode(
                 id=triple.tail_id,
                 name=triple.tail_name,
-                type=detect_type(triple.tail_name),
+                type=get_entity_type(triple.tail_name, context=f"Related to {triple.relation_name}"),
                 relevance_score=triple.relevance_score
             )
             
