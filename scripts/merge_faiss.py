@@ -165,14 +165,69 @@ def create_new_index():
     # Initialize ID map
     id_map = {}
     
-    # Train index with random data (will be retrained with real data later)
+    # Try to train with real data first
     if not index.is_trained:
-        logger.info("Training index with random data")
-        train_size = 1000
-        train_data = np.random.random((train_size, dim)).astype(np.float32)
-        index.train(train_data)
+        logger.info("Training index with real data if available")
+        if not train_index_with_real_data(index):
+            logger.info("No real data available, training with random data")
+            train_size = 1000
+            train_data = np.random.random((train_size, dim)).astype(np.float32)
+            index.train(train_data)
     
     return index, id_map
+
+def train_index_with_real_data(index):
+    """Train FAISS index with real embeddings from Neo4j"""
+    try:
+        from app.database import neo4j_db
+        from app.ml.embedder import embed_text
+        
+        # Get a sample of triples from Neo4j for training
+        query = """
+        MATCH (h)-[r:REL]->(t)
+        RETURN r.id as id, h.name as head_name, r.name as relation_name, t.name as tail_name
+        LIMIT 2000
+        """
+        
+        result = neo4j_db.run_query(query)
+        
+        if not result:
+            logger.warning("No triples found in Neo4j for training")
+            return False
+        
+        logger.info(f"Found {len(result)} triples for training")
+        
+        # Generate embeddings for training
+        training_embeddings = []
+        for i, record in enumerate(result):
+            if i % 100 == 0:
+                logger.info(f"Processing training triple {i+1}/{len(result)}")
+            
+            # Create triple text
+            triple_text = f"{record['head_name']} {record['relation_name']} {record['tail_name']}"
+            
+            # Get embedding
+            embedding = embed_text(triple_text)
+            training_embeddings.append(embedding)
+            
+            # Limit training data to avoid memory issues
+            if len(training_embeddings) >= 1000:
+                break
+        
+        if len(training_embeddings) < 100:
+            logger.warning(f"Only {len(training_embeddings)} embeddings available, using random data instead")
+            return False
+        
+        # Convert to numpy array and train
+        training_data = np.array(training_embeddings, dtype=np.float32)
+        logger.info(f"Training FAISS index with {len(training_data)} real embeddings")
+        index.train(training_data)
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error training with real data: {e}")
+        return False
 
 def rebuild_index():
     """

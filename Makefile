@@ -371,6 +371,16 @@ rebuild-index: ## Maintenance - Rebuild FAISS index
 	@echo "🔄 Rebuilding FAISS index..."
 	@$(VENV_PYTHON) scripts/merge_faiss.py
 
+.PHONY: train-faiss
+train-faiss: ## Maintenance - Train FAISS index with real data from knowledge graph
+	@echo "🧠 Training FAISS index with real data..."
+	@$(VENV_PYTHON) scripts/train_faiss.py --verify
+
+.PHONY: train-faiss-force
+train-faiss-force: ## Maintenance - Force retrain FAISS index even if it exists
+	@echo "🧠 Force retraining FAISS index with real data..."
+	@$(VENV_PYTHON) scripts/train_faiss.py --force --verify
+
 # ============================================================================
 # Special Targets
 # ============================================================================

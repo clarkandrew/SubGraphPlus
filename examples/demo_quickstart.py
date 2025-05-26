@@ -127,27 +127,30 @@ def ensure_mlp_model():
         import torch
         import torch.nn as nn
         
-        class SimpleMLP(nn.Module):
-            def __init__(self):
-                super().__init__()
-                self.fc1 = nn.Linear(1000, 512)
-                self.fc2 = nn.Linear(512, 256)
-                self.fc3 = nn.Linear(256, 1)
-                self.relu = nn.ReLU()
-                self.sigmoid = nn.Sigmoid()
-                
-            def forward(self, x):
-                x = self.relu(self.fc1(x))
-                x = self.relu(self.fc2(x))
-                x = self.sigmoid(self.fc3(x))
-                return x
+        # Import the existing SimpleMLP class from the retriever module
+        sys.path.append(str(Path(__file__).parent.parent))
+        from app.retriever import SimpleMLP
         
-        model = SimpleMLP()
-        torch.save(model, model_path)
+        # Create model with standard dimensions
+        model = SimpleMLP(input_dim=4116, hidden_dim=1024, output_dim=1)
+        
+        # Save the model state dict in the expected format
+        checkpoint = {
+            'config': {'input_dim': 4116, 'hidden_dim': 1024, 'output_dim': 1},
+            'model_state_dict': model.state_dict()
+        }
+        
+        # Ensure the models directory exists
+        model_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        torch.save(checkpoint, model_path)
         logger.info(f"Created placeholder MLP model at {model_path}")
         return True
-    except ImportError:
-        logger.warning("PyTorch not available, skipping MLP model creation")
+    except ImportError as e:
+        logger.warning(f"PyTorch or SimpleMLP not available: {e}, skipping MLP model creation")
+        return False
+    except Exception as e:
+        logger.error(f"Error creating MLP model: {e}")
         return False
 
 def start_server(port=8000):
@@ -156,7 +159,7 @@ def start_server(port=8000):
     
     # Start the server in a subprocess
     server_process = subprocess.Popen(
-        [sys.executable, "main.py", "--port", str(port)],
+        [sys.executable, "src/main.py", "--port", str(port)],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True
