@@ -784,6 +784,11 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 - **Domain Adaptability**: Works with Biblical text, legal documents, scientific papers, etc.
 - **Offline Operation**: No external API dependencies, fully self-contained
 
+**Key Distinction:**
+- **REBEL**: Extracts **relations** (`Jesus → place of birth → Bethlehem`)
+- **Entity Typing**: Classifies **entity types** (`Jesus:Person`, `Bethlehem:Location`)
+- **Combined**: `(Jesus:Person) --[place of birth]--> (Bethlehem:Location)`
+
 ### 2. **Dynamic Knowledge Graph Construction**
 - **Live Ingestion Pipeline**: Build KGs from any text corpus in real-time
 - **Incremental Updates**: Add new content without rebuilding entire graph

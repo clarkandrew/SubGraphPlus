@@ -1,192 +1,222 @@
+"""
+Tests for the production-ready entity typing service
+"""
+
 import unittest
-import tempfile
-import json
-from pathlib import Path
+from unittest.mock import patch, MagicMock
 import sys
+import os
 
-# Add parent directory to path
-sys.path.append(str(Path(__file__).parent.parent))
+# Add src to path for imports
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from app.entity_typing import EntityTyper, get_entity_type, get_entity_typer
-
+from app.entity_typing import (
+    detect_entity_type,
+    batch_detect_entity_types,
+    schema_type_lookup,
+    predict_type_with_ner,
+    update_entity_type_in_schema,
+    get_supported_types,
+    get_type_statistics
+)
 
 class TestEntityTyping(unittest.TestCase):
-    """Test the new schema-driven entity typing system"""
+    """Test the production-ready entity typing functionality"""
     
-    def setUp(self):
-        """Set up test fixtures"""
-        # Create a temporary type mapping file
-        self.test_mappings = {
-            "Moses": "Person",
-            "Jerusalem": "Location", 
-            "Israelites": "Organization",
-            "Exodus": "Event",
-            "Covenant": "Concept"
+    @patch('app.entity_typing.neo4j_db')
+    def test_schema_type_lookup_hit(self, mock_neo4j_db):
+        """Test successful schema lookup"""
+        # Mock Neo4j response
+        mock_session = MagicMock()
+        mock_result = MagicMock()
+        mock_record = MagicMock()
+        mock_record.__getitem__.return_value = "Person"
+        mock_record.__bool__.return_value = True
+        mock_result.single.return_value = mock_record
+        mock_session.run.return_value = mock_result
+        mock_neo4j_db.get_session.return_value.__enter__.return_value = mock_session
+        
+        result = schema_type_lookup("Jesus")
+        self.assertEqual(result, "Person")
+        
+        # Verify the query was called
+        mock_session.run.assert_called_with(
+            "MATCH (e:Entity {name: $mention}) RETURN e.type as type LIMIT 1",
+            {"mention": "Jesus"}
+        )
+    
+    @patch('app.entity_typing.neo4j_db')
+    def test_schema_type_lookup_miss(self, mock_neo4j_db):
+        """Test schema lookup miss"""
+        # Mock Neo4j response - no results
+        mock_session = MagicMock()
+        mock_result = MagicMock()
+        mock_result.single.return_value = None
+        mock_session.run.return_value = mock_result
+        mock_neo4j_db.get_session.return_value.__enter__.return_value = mock_session
+        
+        result = schema_type_lookup("UnknownEntity")
+        self.assertIsNone(result)
+    
+    @patch('app.entity_typing.get_ner_pipeline')
+    def test_predict_type_with_ner_transformers(self, mock_get_pipeline):
+        """Test NER prediction using transformers"""
+        # Mock transformers NER pipeline
+        mock_pipeline = MagicMock()
+        mock_pipeline.return_value = [{"entity_group": "PER", "score": 0.99}]
+        mock_get_pipeline.return_value = mock_pipeline
+        
+        result = predict_type_with_ner("John Smith")
+        self.assertEqual(result, "Person")
+        
+        mock_pipeline.assert_called_once_with("John Smith")
+    
+    @patch('app.entity_typing.get_ner_pipeline')
+    @patch('app.entity_typing.get_spacy_ner')
+    def test_predict_type_with_ner_spacy_fallback(self, mock_get_spacy, mock_get_pipeline):
+        """Test NER prediction falling back to spaCy"""
+        # Mock transformers failure
+        mock_get_pipeline.return_value = None
+        
+        # Mock spaCy success
+        mock_nlp = MagicMock()
+        mock_doc = MagicMock()
+        mock_ent = MagicMock()
+        mock_ent.label_ = "PERSON"
+        mock_doc.ents = [mock_ent]
+        mock_nlp.return_value = mock_doc
+        mock_get_spacy.return_value = mock_nlp
+        
+        result = predict_type_with_ner("Jane Doe")
+        self.assertEqual(result, "Person")
+        
+        mock_nlp.assert_called_once_with("Jane Doe")
+    
+    @patch('app.entity_typing.schema_type_lookup')
+    @patch('app.entity_typing.predict_type_with_ner')
+    def test_detect_entity_type_schema_first(self, mock_ner, mock_schema):
+        """Test that schema lookup is tried first"""
+        mock_schema.return_value = "Person"
+        mock_ner.return_value = "Organization"  # Should not be called
+        
+        result = detect_entity_type("Jesus")
+        self.assertEqual(result, "Person")
+        
+        mock_schema.assert_called_once_with("Jesus")
+        mock_ner.assert_not_called()
+    
+    @patch('app.entity_typing.schema_type_lookup')
+    @patch('app.entity_typing.predict_type_with_ner')
+    def test_detect_entity_type_ner_fallback(self, mock_ner, mock_schema):
+        """Test NER fallback when schema lookup misses"""
+        mock_schema.return_value = None
+        mock_ner.return_value = "Location"
+        
+        result = detect_entity_type("NewYork")
+        self.assertEqual(result, "Location")
+        
+        mock_schema.assert_called_once_with("NewYork")
+        mock_ner.assert_called_once_with("NewYork")
+    
+    @patch('app.entity_typing.neo4j_db')
+    def test_batch_detect_entity_types(self, mock_neo4j_db):
+        """Test batch entity type detection"""
+        # Mock Neo4j batch response
+        mock_session = MagicMock()
+        mock_result = MagicMock()
+        mock_records = [
+            {"mention": "Jesus", "type": "Person"},
+            {"mention": "Jerusalem", "type": "Location"}
+        ]
+        mock_result.__iter__.return_value = iter(mock_records)
+        mock_session.run.return_value = mock_result
+        mock_neo4j_db.get_session.return_value.__enter__.return_value = mock_session
+        
+        mentions = ["Jesus", "Jerusalem", "UnknownEntity"]
+        
+        with patch('app.entity_typing.predict_type_with_ner') as mock_ner:
+            mock_ner.return_value = "Entity"
+            
+            result = batch_detect_entity_types(mentions)
+            
+            expected = {
+                "Jesus": "Person",
+                "Jerusalem": "Location", 
+                "UnknownEntity": "Entity"
+            }
+            self.assertEqual(result, expected)
+    
+    @patch('app.entity_typing.neo4j_db')
+    def test_update_entity_type_in_schema(self, mock_neo4j_db):
+        """Test updating entity type in schema"""
+        # Mock successful update
+        mock_session = MagicMock()
+        mock_result = MagicMock()
+        mock_record = MagicMock()
+        mock_record.__bool__.return_value = True
+        mock_result.single.return_value = mock_record
+        mock_session.run.return_value = mock_result
+        mock_neo4j_db.get_session.return_value.__enter__.return_value = mock_session
+        
+        result = update_entity_type_in_schema("NewEntity", "Person")
+        self.assertTrue(result)
+        
+        # Verify the update query
+        mock_session.run.assert_called_with(
+            "MERGE (e:Entity {name: $mention}) SET e.type = $type RETURN e.name as name",
+            {"mention": "NewEntity", "type": "Person"}
+        )
+    
+    def test_get_supported_types(self):
+        """Test getting supported entity types"""
+        types = get_supported_types()
+        expected_types = ["Person", "Location", "Organization", "Event", "Concept", "Entity"]
+        self.assertEqual(types, expected_types)
+    
+    @patch('app.entity_typing.neo4j_db')
+    def test_get_type_statistics(self, mock_neo4j_db):
+        """Test getting type statistics"""
+        # Mock Neo4j response
+        mock_session = MagicMock()
+        mock_result = MagicMock()
+        mock_records = [
+            {"type": "Person", "count": 100},
+            {"type": "Location", "count": 50},
+            {"type": "Organization", "count": 25}
+        ]
+        mock_result.__iter__.return_value = iter(mock_records)
+        mock_session.run.return_value = mock_result
+        mock_neo4j_db.get_session.return_value.__enter__.return_value = mock_session
+        
+        result = get_type_statistics()
+        expected = {
+            "Person": 100,
+            "Location": 50,
+            "Organization": 25
         }
-        
-        self.temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False)
-        json.dump(self.test_mappings, self.temp_file)
-        self.temp_file.close()
-        
-        # Create typer with test mapping
-        self.typer = EntityTyper(type_mapping_path=self.temp_file.name)
-    
-    def tearDown(self):
-        """Clean up test fixtures"""
-        Path(self.temp_file.name).unlink()
-    
-    def test_schema_mapping_lookup(self):
-        """Test that schema mappings are used correctly"""
-        # Direct mappings should work
-        self.assertEqual(self.typer.get_entity_type("Moses"), "Person")
-        self.assertEqual(self.typer.get_entity_type("Jerusalem"), "Location")
-        self.assertEqual(self.typer.get_entity_type("Israelites"), "Organization")
-        self.assertEqual(self.typer.get_entity_type("Exodus"), "Event")
-        self.assertEqual(self.typer.get_entity_type("Covenant"), "Concept")
-    
-    def test_case_insensitive_mapping(self):
-        """Test case-insensitive mapping lookup"""
-        self.assertEqual(self.typer.get_entity_type("moses"), "Person")
-        self.assertEqual(self.typer.get_entity_type("JERUSALEM"), "Location")
-        self.assertEqual(self.typer.get_entity_type("israelites"), "Organization")
-    
-    def test_pattern_based_fallback(self):
-        """Test pattern-based typing for unmapped entities"""
-        # Person patterns
-        self.assertEqual(self.typer.get_entity_type("Dr. Smith"), "Person")
-        self.assertEqual(self.typer.get_entity_type("King David"), "Person")
-        self.assertEqual(self.typer.get_entity_type("Prophet Isaiah"), "Person")
-        
-        # Location patterns
-        self.assertEqual(self.typer.get_entity_type("Mount Sinai"), "Location")
-        self.assertEqual(self.typer.get_entity_type("Red Sea"), "Location")
-        self.assertEqual(self.typer.get_entity_type("New York City"), "Location")
-        
-        # Organization patterns
-        self.assertEqual(self.typer.get_entity_type("Acme Corp."), "Organization")
-        self.assertEqual(self.typer.get_entity_type("Tribe of Benjamin"), "Organization")
-        
-        # Event patterns
-        self.assertEqual(self.typer.get_entity_type("Great Flood"), "Event")
-        self.assertEqual(self.typer.get_entity_type("Passover"), "Event")
-        
-        # Concept patterns
-        self.assertEqual(self.typer.get_entity_type("Ten Commandments"), "Concept")
-        self.assertEqual(self.typer.get_entity_type("Salvation"), "Concept")
-    
-    def test_context_disambiguation(self):
-        """Test context-based disambiguation"""
-        # Context should help with ambiguous entities
-        person_context = "Moses said to the people"
-        location_context = "traveled to Jerusalem"
-        
-        # These should work even without explicit mapping
-        result = self.typer.get_entity_type("David", context=person_context)
-        self.assertIn(result, ["Person", "Entity"])  # Should prefer Person with person context
-        
-        result = self.typer.get_entity_type("Bethlehem", context=location_context)
-        self.assertIn(result, ["Location", "Entity"])  # Should prefer Location with location context
-    
-    def test_default_fallback(self):
-        """Test default Entity type for unknown entities"""
-        self.assertEqual(self.typer.get_entity_type("UnknownEntity"), "Entity")
-        self.assertEqual(self.typer.get_entity_type("RandomText123"), "Entity")
+        self.assertEqual(result, expected)
     
     def test_empty_input_handling(self):
-        """Test handling of empty or invalid inputs"""
-        self.assertEqual(self.typer.get_entity_type(""), "Entity")
-        self.assertEqual(self.typer.get_entity_type("   "), "Entity")
-        self.assertEqual(self.typer.get_entity_type(None), "Entity")
+        """Test handling of empty or None input"""
+        self.assertEqual(detect_entity_type(""), "Entity")
+        self.assertEqual(detect_entity_type("   "), "Entity")
+        self.assertEqual(detect_entity_type(None), "Entity")
     
-    def test_dynamic_mapping_addition(self):
-        """Test adding new mappings dynamically"""
-        # Add new mapping
-        self.typer.add_type_mapping("TestEntity", "TestType")
-        self.assertEqual(self.typer.get_entity_type("TestEntity"), "TestType")
+    @patch('app.entity_typing.schema_type_lookup')
+    def test_caching_behavior(self, mock_schema):
+        """Test that caching works correctly"""
+        mock_schema.return_value = "Person"
         
-        # Bulk add mappings
-        new_mappings = {
-            "Entity1": "Type1",
-            "Entity2": "Type2"
-        }
-        self.typer.bulk_add_mappings(new_mappings)
-        self.assertEqual(self.typer.get_entity_type("Entity1"), "Type1")
-        self.assertEqual(self.typer.get_entity_type("Entity2"), "Type2")
-    
-    def test_supported_types(self):
-        """Test getting supported entity types"""
-        supported_types = self.typer.get_supported_types()
+        # First call
+        result1 = detect_entity_type("TestEntity")
+        # Second call should use cache
+        result2 = detect_entity_type("TestEntity")
         
-        # Should include mapped types
-        self.assertIn("Person", supported_types)
-        self.assertIn("Location", supported_types)
-        self.assertIn("Organization", supported_types)
-        self.assertIn("Event", supported_types)
-        self.assertIn("Concept", supported_types)
+        self.assertEqual(result1, "Person")
+        self.assertEqual(result2, "Person")
         
-        # Should include default type
-        self.assertIn("Entity", supported_types)
-    
-    def test_export_mappings(self):
-        """Test exporting mappings to file"""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-            export_path = f.name
-        
-        try:
-            self.typer.export_mappings(export_path)
-            
-            # Verify exported content
-            with open(export_path, 'r') as f:
-                exported_data = json.load(f)
-            
-            # Should contain original mappings
-            for entity, entity_type in self.test_mappings.items():
-                self.assertEqual(exported_data[entity], entity_type)
-                
-        finally:
-            Path(export_path).unlink()
-    
-    def test_global_entity_typer(self):
-        """Test global entity typer functions"""
-        # Test global function
-        result = get_entity_type("Dr. Johnson")
-        self.assertEqual(result, "Person")
-        
-        # Test global instance
-        typer_instance = get_entity_typer()
-        self.assertIsInstance(typer_instance, EntityTyper)
-    
-    def test_backward_compatibility(self):
-        """Test backward compatibility with old detect_type function"""
-        from app.entity_typing import detect_type
-        
-        # Should still work but issue deprecation warning
-        result = detect_type("Mr. Smith")
-        self.assertEqual(result, "Person")
-    
-    def test_biblical_entities(self):
-        """Test specific Biblical entity typing"""
-        # Test entities that should be properly typed for Biblical content
-        biblical_tests = [
-            ("Moses", "Person"),
-            ("Aaron", "Person"), 
-            ("Red Sea", "Location"),
-            ("Mount Sinai", "Location"),
-            ("Israelites", "Organization"),
-            ("Pharisees", "Organization"),
-            ("Exodus", "Event"),
-            ("Passover", "Event"),
-            ("Ten Commandments", "Concept"),
-            ("Covenant", "Concept")
-        ]
-        
-        for entity, expected_type in biblical_tests:
-            with self.subTest(entity=entity):
-                result = self.typer.get_entity_type(entity)
-                # Should be either the expected type or Entity (fallback)
-                self.assertIn(result, [expected_type, "Entity"], 
-                             f"Entity '{entity}' got type '{result}', expected '{expected_type}' or 'Entity'")
-
+        # Schema lookup should only be called once due to caching
+        mock_schema.assert_called_once_with("TestEntity")
 
 if __name__ == '__main__':
     unittest.main() 
