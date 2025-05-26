@@ -1,5 +1,5 @@
 """
-Tests for the production-ready entity typing service
+Tests for the production-ready entity typing service with OntoNotes-5 NER
 """
 
 import unittest
@@ -7,194 +7,40 @@ from unittest.mock import patch, MagicMock
 import sys
 import os
 
+# Set testing environment to disable database connections
+os.environ['TESTING'] = '1'
+os.environ['DISABLE_MODELS'] = '1'
+
 # Add src to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from app.entity_typing import (
     detect_entity_type,
     batch_detect_entity_types,
-    schema_type_lookup,
-    predict_type_with_ner,
-    update_entity_type_in_schema,
+    predict_type_with_ontonotes,
     get_supported_types,
-    get_type_statistics
+    ONTONOTES_TO_KG
 )
 
-class TestEntityTyping(unittest.TestCase):
-    """Test the production-ready entity typing functionality"""
+class TestEntityTypingOntoNotes(unittest.TestCase):
+    """Test the OntoNotes-5 entity typing functionality"""
     
-    @patch('app.entity_typing.neo4j_db')
-    def test_schema_type_lookup_hit(self, mock_neo4j_db):
-        """Test successful schema lookup"""
-        # Mock Neo4j response
-        mock_session = MagicMock()
-        mock_result = MagicMock()
-        mock_record = MagicMock()
-        mock_record.__getitem__.return_value = "Person"
-        mock_record.__bool__.return_value = True
-        mock_result.single.return_value = mock_record
-        mock_session.run.return_value = mock_result
-        mock_neo4j_db.get_session.return_value.__enter__.return_value = mock_session
-        
-        result = schema_type_lookup("Jesus")
-        self.assertEqual(result, "Person")
-        
-        # Verify the query was called
-        mock_session.run.assert_called_with(
-            "MATCH (e:Entity {name: $mention}) RETURN e.type as type LIMIT 1",
-            {"mention": "Jesus"}
-        )
-    
-    @patch('app.entity_typing.neo4j_db')
-    def test_schema_type_lookup_miss(self, mock_neo4j_db):
-        """Test schema lookup miss"""
-        # Mock Neo4j response - no results
-        mock_session = MagicMock()
-        mock_result = MagicMock()
-        mock_result.single.return_value = None
-        mock_session.run.return_value = mock_result
-        mock_neo4j_db.get_session.return_value.__enter__.return_value = mock_session
-        
-        result = schema_type_lookup("UnknownEntity")
-        self.assertIsNone(result)
-    
-    @patch('app.entity_typing.get_ner_pipeline')
-    def test_predict_type_with_ner_transformers(self, mock_get_pipeline):
-        """Test NER prediction using transformers"""
-        # Mock transformers NER pipeline
-        mock_pipeline = MagicMock()
-        mock_pipeline.return_value = [{"entity_group": "PER", "score": 0.99}]
-        mock_get_pipeline.return_value = mock_pipeline
-        
-        result = predict_type_with_ner("John Smith")
-        self.assertEqual(result, "Person")
-        
-        mock_pipeline.assert_called_once_with("John Smith")
-    
-    @patch('app.entity_typing.get_ner_pipeline')
-    @patch('app.entity_typing.get_spacy_ner')
-    def test_predict_type_with_ner_spacy_fallback(self, mock_get_spacy, mock_get_pipeline):
-        """Test NER prediction falling back to spaCy"""
-        # Mock transformers failure
-        mock_get_pipeline.return_value = None
-        
-        # Mock spaCy success
-        mock_nlp = MagicMock()
-        mock_doc = MagicMock()
-        mock_ent = MagicMock()
-        mock_ent.label_ = "PERSON"
-        mock_doc.ents = [mock_ent]
-        mock_nlp.return_value = mock_doc
-        mock_get_spacy.return_value = mock_nlp
-        
-        result = predict_type_with_ner("Jane Doe")
-        self.assertEqual(result, "Person")
-        
-        mock_nlp.assert_called_once_with("Jane Doe")
-    
-    @patch('app.entity_typing.schema_type_lookup')
-    @patch('app.entity_typing.predict_type_with_ner')
-    def test_detect_entity_type_schema_first(self, mock_ner, mock_schema):
-        """Test that schema lookup is tried first"""
-        mock_schema.return_value = "Person"
-        mock_ner.return_value = "Organization"  # Should not be called
-        
-        result = detect_entity_type("Jesus")
-        self.assertEqual(result, "Person")
-        
-        mock_schema.assert_called_once_with("Jesus")
-        mock_ner.assert_not_called()
-    
-    @patch('app.entity_typing.schema_type_lookup')
-    @patch('app.entity_typing.predict_type_with_ner')
-    def test_detect_entity_type_ner_fallback(self, mock_ner, mock_schema):
-        """Test NER fallback when schema lookup misses"""
-        mock_schema.return_value = None
-        mock_ner.return_value = "Location"
-        
-        result = detect_entity_type("NewYork")
-        self.assertEqual(result, "Location")
-        
-        mock_schema.assert_called_once_with("NewYork")
-        mock_ner.assert_called_once_with("NewYork")
-    
-    @patch('app.entity_typing.neo4j_db')
-    def test_batch_detect_entity_types(self, mock_neo4j_db):
-        """Test batch entity type detection"""
-        # Mock Neo4j batch response
-        mock_session = MagicMock()
-        mock_result = MagicMock()
-        mock_records = [
-            {"mention": "Jesus", "type": "Person"},
-            {"mention": "Jerusalem", "type": "Location"}
-        ]
-        mock_result.__iter__.return_value = iter(mock_records)
-        mock_session.run.return_value = mock_result
-        mock_neo4j_db.get_session.return_value.__enter__.return_value = mock_session
-        
-        mentions = ["Jesus", "Jerusalem", "UnknownEntity"]
-        
-        with patch('app.entity_typing.predict_type_with_ner') as mock_ner:
-            mock_ner.return_value = "Entity"
-            
-            result = batch_detect_entity_types(mentions)
-            
-            expected = {
-                "Jesus": "Person",
-                "Jerusalem": "Location", 
-                "UnknownEntity": "Entity"
-            }
-            self.assertEqual(result, expected)
-    
-    @patch('app.entity_typing.neo4j_db')
-    def test_update_entity_type_in_schema(self, mock_neo4j_db):
-        """Test updating entity type in schema"""
-        # Mock successful update
-        mock_session = MagicMock()
-        mock_result = MagicMock()
-        mock_record = MagicMock()
-        mock_record.__bool__.return_value = True
-        mock_result.single.return_value = mock_record
-        mock_session.run.return_value = mock_result
-        mock_neo4j_db.get_session.return_value.__enter__.return_value = mock_session
-        
-        result = update_entity_type_in_schema("NewEntity", "Person")
-        self.assertTrue(result)
-        
-        # Verify the update query
-        mock_session.run.assert_called_with(
-            "MERGE (e:Entity {name: $mention}) SET e.type = $type RETURN e.name as name",
-            {"mention": "NewEntity", "type": "Person"}
-        )
+    def test_ontonotes_mapping(self):
+        """Test that OntoNotes labels map correctly to KG buckets"""
+        # Test key mappings from the spec
+        self.assertEqual(ONTONOTES_TO_KG["PERSON"], "Person")
+        self.assertEqual(ONTONOTES_TO_KG["GPE"], "Location")
+        self.assertEqual(ONTONOTES_TO_KG["ORG"], "Organization")
+        self.assertEqual(ONTONOTES_TO_KG["DATE"], "Date")
+        self.assertEqual(ONTONOTES_TO_KG["CARDINAL"], "Number")
+        self.assertEqual(ONTONOTES_TO_KG["_DEFAULT"], "Entity")
     
     def test_get_supported_types(self):
-        """Test getting supported entity types"""
+        """Test getting supported entity types from OntoNotes mapping"""
         types = get_supported_types()
-        expected_types = ["Person", "Location", "Organization", "Event", "Concept", "Entity"]
-        self.assertEqual(types, expected_types)
-    
-    @patch('app.entity_typing.neo4j_db')
-    def test_get_type_statistics(self, mock_neo4j_db):
-        """Test getting type statistics"""
-        # Mock Neo4j response
-        mock_session = MagicMock()
-        mock_result = MagicMock()
-        mock_records = [
-            {"type": "Person", "count": 100},
-            {"type": "Location", "count": 50},
-            {"type": "Organization", "count": 25}
-        ]
-        mock_result.__iter__.return_value = iter(mock_records)
-        mock_session.run.return_value = mock_result
-        mock_neo4j_db.get_session.return_value.__enter__.return_value = mock_session
-        
-        result = get_type_statistics()
-        expected = {
-            "Person": 100,
-            "Location": 50,
-            "Organization": 25
-        }
-        self.assertEqual(result, expected)
+        # Should include all unique values from ONTONOTES_TO_KG
+        expected_types = set(ONTONOTES_TO_KG.values())
+        self.assertEqual(set(types), expected_types)
     
     def test_empty_input_handling(self):
         """Test handling of empty or None input"""
@@ -203,9 +49,79 @@ class TestEntityTyping(unittest.TestCase):
         self.assertEqual(detect_entity_type(None), "Entity")
     
     @patch('app.entity_typing.schema_type_lookup')
+    @patch('app.entity_typing.get_ontonotes_ner_pipeline')
+    def test_onto_fallback(self, mock_get_pipeline, mock_schema):
+        """Test OntoNotes NER fallback when schema lookup misses"""
+        # Mock schema miss
+        mock_schema.return_value = None
+        
+        # Mock OntoNotes NER success
+        mock_model = MagicMock()
+        mock_model.predict.return_value = [[{"type": "GPE"}]]
+        mock_get_pipeline.return_value = mock_model
+        
+        result = detect_entity_type("NewYork")
+        self.assertEqual(result, "Location")  # GPE maps to Location
+        
+        mock_schema.assert_called_once_with("NewYork")
+        mock_model.predict.assert_called_once_with(["NewYork"])
+    
+    @patch('app.entity_typing.schema_type_lookup')
+    @patch('app.entity_typing.get_ontonotes_ner_pipeline')
+    @patch('app.entity_typing.get_spacy_ner')
+    def test_spacy_fallback(self, mock_get_spacy, mock_get_pipeline, mock_schema):
+        """Test spaCy fallback when OntoNotes returns empty"""
+        # Mock schema miss
+        mock_schema.return_value = None
+        
+        # Mock OntoNotes failure
+        mock_get_pipeline.return_value = None
+        
+        # Mock spaCy success
+        mock_nlp = MagicMock()
+        mock_doc = MagicMock()
+        mock_ent = MagicMock()
+        mock_ent.label_ = "GPE"
+        mock_doc.ents = [mock_ent]
+        mock_nlp.return_value = mock_doc
+        mock_get_spacy.return_value = mock_nlp
+        
+        result = detect_entity_type("London")
+        self.assertEqual(result, "Location")  # GPE maps to Location
+        
+        mock_nlp.assert_called_once_with("London")
+    
+    @patch('app.entity_typing.schema_type_lookup')
+    @patch('app.entity_typing.get_ontonotes_ner_pipeline')
+    def test_batch_cache(self, mock_get_pipeline, mock_schema):
+        """Test that batch processing with identical names triggers only one NER call"""
+        # Mock schema miss for all
+        mock_schema.return_value = None
+        
+        # Mock OntoNotes NER
+        mock_model = MagicMock()
+        mock_model.predict.return_value = [
+            [{"type": "PERSON"}],
+            [{"type": "PERSON"}]  # Same entity, should be cached
+        ]
+        mock_get_pipeline.return_value = mock_model
+        
+        # Call with duplicate names
+        result = batch_detect_entity_types(["John", "John"])
+        
+        expected = {"John": "Person", "John": "Person"}
+        self.assertEqual(result, expected)
+        
+        # Should only call predict once for the batch, not per duplicate
+        self.assertEqual(mock_model.predict.call_count, 1)
+    
+    @patch('app.entity_typing.schema_type_lookup')
     def test_caching_behavior(self, mock_schema):
         """Test that caching works correctly"""
         mock_schema.return_value = "Person"
+        
+        # Clear cache first
+        detect_entity_type.cache_clear()
         
         # First call
         result1 = detect_entity_type("TestEntity")
@@ -217,6 +133,57 @@ class TestEntityTyping(unittest.TestCase):
         
         # Schema lookup should only be called once due to caching
         mock_schema.assert_called_once_with("TestEntity")
+    
+    def test_predict_type_with_ontonotes_mapping(self):
+        """Test the OntoNotes prediction mapping logic"""
+        with patch('app.entity_typing.get_ontonotes_ner_pipeline') as mock_get_pipeline:
+            mock_model = MagicMock()
+            
+            # Test different OntoNotes labels
+            test_cases = [
+                ([{"type": "PERSON"}], "Person"),
+                ([{"type": "GPE"}], "Location"),
+                ([{"type": "ORG"}], "Organization"),
+                ([{"type": "DATE"}], "Date"),
+                ([{"type": "UNKNOWN_TYPE"}], "Entity"),  # Should default
+                ([], "Entity"),  # Empty result should default
+            ]
+            
+            mock_get_pipeline.return_value = mock_model
+            
+            for ner_result, expected_type in test_cases:
+                mock_model.predict.return_value = [ner_result]
+                result = predict_type_with_ontonotes("test")
+                self.assertEqual(result, expected_type, 
+                               f"Failed for NER result {ner_result}")
+    
+    def test_batch_detect_entity_types_deduplication(self):
+        """Test that batch processing deduplicates entity names"""
+        with patch('app.entity_typing.schema_type_lookup') as mock_schema:
+            with patch('app.entity_typing.get_ontonotes_ner_pipeline') as mock_get_pipeline:
+                # Mock schema miss for all
+                mock_schema.return_value = None
+                
+                # Mock OntoNotes NER
+                mock_model = MagicMock()
+                mock_model.predict.return_value = [
+                    [{"type": "PERSON"}],  # For "John"
+                    [{"type": "GPE"}]      # For "London"
+                ]
+                mock_get_pipeline.return_value = mock_model
+                
+                # Call with duplicates
+                result = batch_detect_entity_types(["John", "London", "John", "London"])
+                
+                # Should return dictionary with unique keys only
+                self.assertEqual(len(result), 2)  # Only unique entities
+                self.assertEqual(result["John"], "Person")
+                self.assertEqual(result["London"], "Location")
+                
+                # Should only call predict once with unique entities
+                mock_model.predict.assert_called_once()
+                call_args = mock_model.predict.call_args[0][0]
+                self.assertEqual(set(call_args), {"John", "London"})  # Only unique entities
 
 if __name__ == '__main__':
     unittest.main() 

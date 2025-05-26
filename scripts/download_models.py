@@ -1,228 +1,257 @@
+#!/usr/bin/env python3
+"""
+Model Download Script for SubgraphRAG+ Entity Typing
+Downloads and vendors models based on config.json definitions
+"""
+
 import os
 import sys
+import json
 import argparse
 import logging
-import zipfile
-import requests
 from pathlib import Path
-from tqdm import tqdm
 
-# Add parent directory to path so script can import app modules
-parent_dir = str(Path(__file__).parent.parent)
-sys.path.append(parent_dir)
-
-# Configure logging
+# Set up logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
-logger = logging.getLogger("download_models")
+logger = logging.getLogger(__name__)
 
-# Constants
-DEFAULT_MODEL_DIR = os.path.join(parent_dir, "models")
-MLP_MODEL_URL = "https://huggingface.co/SubgraphRAG/mlp-scorer/resolve/main/mlp_model.zip"
-LOCAL_MODELS_ZIP = os.path.join(parent_dir, "models.zip")
+def load_config():
+    """Load configuration from config.json"""
+    config_path = Path(__file__).parent.parent / "config" / "config.json"
+    try:
+        with open(config_path, 'r') as f:
+            return json.load(f)
+    except Exception as e:
+        logger.error(f"Failed to load config: {e}")
+        return {}
 
-
-def download_file(url, local_filename=None, chunk_size=8192):
+def download_ontonotes_model(config: dict = None):
     """
-    Download a file from a URL with progress bar
+    Download the OntoNotes-5 NER model for offline usage
+    Uses configuration from config.json
     
     Args:
-        url: URL to download
-        local_filename: Local filename to save to
-        chunk_size: Size of chunks to download
-        
-    Returns:
-        Path to downloaded file
+        config: Configuration dictionary (loaded from config.json)
     """
-    if local_filename is None:
-        local_filename = url.split('/')[-1]
+    if not config:
+        config = load_config()
+    
+    ontonotes_config = config.get("models", {}).get("entity_typing", {}).get("ontonotes_ner", {})
+    
+    model_name = ontonotes_config.get("model", "tner/roberta-large-ontonotes5")
+    target_dir = ontonotes_config.get("local_path", "models/roberta-large-ontonotes5")
     
     try:
-        with requests.get(url, stream=True) as r:
-            r.raise_for_status()
-            total_size = int(r.headers.get('content-length', 0))
-            
-            with open(local_filename, 'wb') as f, tqdm(
-                desc=f"Downloading {os.path.basename(local_filename)}",
-                total=total_size,
-                unit='B',
-                unit_scale=True,
-                unit_divisor=1024,
-            ) as bar:
-                for chunk in r.iter_content(chunk_size=chunk_size):
-                    if chunk:  # filter out keep-alive new chunks
-                        f.write(chunk)
-                        bar.update(len(chunk))
-    except requests.RequestException as e:
-        logger.error(f"Download failed: {e}")
-        if os.path.exists(local_filename):
-            os.remove(local_filename)
-        return None
-    
-    return local_filename
-
-
-def extract_zip(zip_file, extract_to):
-    """
-    Extract a zip file
-    
-    Args:
-        zip_file: Path to zip file
-        extract_to: Directory to extract to
+        from huggingface_hub import snapshot_download
         
-    Returns:
-        True if successful, False otherwise
-    """
-    try:
-        os.makedirs(extract_to, exist_ok=True)
+        logger.info(f"Downloading OntoNotes-5 NER model: {model_name}")
+        logger.info(f"Target directory: {target_dir}")
         
-        with zipfile.ZipFile(zip_file, 'r') as zip_ref:
-            # Get number of files for progress bar
-            file_count = len(zip_ref.namelist())
-            logger.info(f"Extracting {file_count} files to {extract_to}")
-            
-            # Extract with progress bar
-            for file in tqdm(zip_ref.namelist(), desc="Extracting files"):
-                zip_ref.extract(file, extract_to)
+        # Create target directory
+        Path(target_dir).mkdir(parents=True, exist_ok=True)
         
+        # Download the model
+        snapshot_download(
+            repo_id=model_name,
+            local_dir=target_dir,
+            local_dir_use_symlinks=False
+        )
+        
+        logger.info(f"Successfully downloaded model to {target_dir}")
         return True
-    except zipfile.BadZipFile:
-        logger.error(f"Invalid zip file: {zip_file}")
+        
+    except ImportError:
+        logger.error("huggingface_hub not installed. Run: pip install huggingface_hub")
         return False
     except Exception as e:
-        logger.error(f"Extraction failed: {str(e)}")
+        logger.error(f"Failed to download model: {e}")
         return False
 
-
-def check_local_models_zip():
-    """Check if models.zip exists locally"""
-    if os.path.exists(LOCAL_MODELS_ZIP):
-        logger.info(f"Found local models.zip: {LOCAL_MODELS_ZIP}")
-        return LOCAL_MODELS_ZIP
-    return None
-
-
-def download_models(model_dir=DEFAULT_MODEL_DIR, force=False):
+def download_rebel_model(config: dict = None):
     """
-    Download and extract MLP model
+    Download the REBEL model for information extraction
+    Uses configuration from config.json
     
     Args:
-        model_dir: Directory to save models to
-        force: Force download even if models already exist
-        
-    Returns:
-        True if successful, False otherwise
+        config: Configuration dictionary (loaded from config.json)
     """
-    # Create model directory if it doesn't exist
-    os.makedirs(model_dir, exist_ok=True)
+    if not config:
+        config = load_config()
     
-    # Check if models already exist
-    mlp_dir = os.path.join(model_dir, "mlp")
-    if os.path.exists(mlp_dir) and not force:
-        logger.info(f"MLP model already exists at {mlp_dir}")
+    rebel_config = config.get("models", {}).get("information_extraction", {}).get("rebel", {})
+    
+    model_name = rebel_config.get("model", "Babelscape/rebel-large")
+    target_dir = rebel_config.get("local_path", "models/rebel-large")
+    
+    try:
+        from huggingface_hub import snapshot_download
+        
+        logger.info(f"Downloading REBEL model: {model_name}")
+        logger.info(f"Target directory: {target_dir}")
+        
+        # Create target directory
+        Path(target_dir).mkdir(parents=True, exist_ok=True)
+        
+        # Download the model
+        snapshot_download(
+            repo_id=model_name,
+            local_dir=target_dir,
+            local_dir_use_symlinks=False
+        )
+        
+        logger.info(f"Successfully downloaded model to {target_dir}")
         return True
-    
-    # Check if we have a local models.zip first
-    local_zip = check_local_models_zip()
-    
-    if not local_zip:
-        # Try to download from HuggingFace
-        logger.info(f"Downloading MLP model from {MLP_MODEL_URL}")
-        download_path = download_file(MLP_MODEL_URL, os.path.join(model_dir, "mlp_model.zip"))
-        if not download_path:
-            logger.warning("Failed to download MLP model from HuggingFace. Creating mock model for development.")
-            return create_mock_mlp_model(model_dir)
-    else:
-        # Use local zip file
-        download_path = local_zip
-    
-    # Extract model
-    logger.info(f"Extracting MLP model to {model_dir}")
-    if not extract_zip(download_path, model_dir):
-        logger.error("Failed to extract MLP model")
-        logger.warning("Creating mock model for development.")
-        return create_mock_mlp_model(model_dir)
-    
-    # Clean up zip file if it was downloaded (not if it was the local one)
-    if download_path != LOCAL_MODELS_ZIP and os.path.exists(download_path):
-        os.remove(download_path)
-    
-    logger.info("MLP model downloaded and extracted successfully")
-    return True
-
-
-def create_mock_mlp_model(model_dir):
-    """
-    Create a mock MLP model for development purposes
-    
-    Args:
-        model_dir: Directory to save models to
         
-    Returns:
-        True if successful
-    """
-    import pickle
-    import numpy as np
-    
-    mlp_dir = os.path.join(model_dir, "mlp")
-    os.makedirs(mlp_dir, exist_ok=True)
-    
-    # Create a simple mock model file
-    mock_model_data = {
-        'model_type': 'mock_mlp',
-        'input_size': 768,  # Standard embedding size
-        'hidden_size': 256,
-        'output_size': 1,
-        'weights': {
-            'layer1': np.random.randn(768, 256).astype(np.float32),
-            'layer2': np.random.randn(256, 1).astype(np.float32)
-        },
-        'biases': {
-            'layer1': np.random.randn(256).astype(np.float32),
-            'layer2': np.random.randn(1).astype(np.float32)
-        }
-    }
-    
-    # Save mock model
-    model_path = os.path.join(mlp_dir, "model.pkl")
-    with open(model_path, 'wb') as f:
-        pickle.dump(mock_model_data, f)
-    
-    # Create a config file
-    config_path = os.path.join(mlp_dir, "config.json")
-    config_data = {
-        "model_type": "mock_mlp",
-        "input_size": 768,
-        "hidden_size": 256,
-        "output_size": 1,
-        "description": "Mock MLP model for development. Replace with real model for production."
-    }
-    
-    import json
-    with open(config_path, 'w') as f:
-        json.dump(config_data, f, indent=2)
-    
-    logger.info(f"Created mock MLP model at {mlp_dir}")
-    logger.warning("This is a mock model for development only. For production, please provide a real MLP model.")
-    
-    return True
+    except ImportError:
+        logger.error("huggingface_hub not installed. Run: pip install huggingface_hub")
+        return False
+    except Exception as e:
+        logger.error(f"Failed to download model: {e}")
+        return False
 
+def download_spacy_model(config: dict = None):
+    """
+    Download spaCy model for fallback NER
+    Uses configuration from config.json
+    """
+    if not config:
+        config = load_config()
+    
+    spacy_config = config.get("models", {}).get("entity_typing", {}).get("spacy_fallback", {})
+    model_name = spacy_config.get("model", "en_core_web_sm")
+    
+    try:
+        import subprocess
+        
+        logger.info(f"Downloading spaCy model: {model_name}")
+        result = subprocess.run([
+            sys.executable, "-m", "spacy", "download", model_name
+        ], capture_output=True, text=True)
+        
+        if result.returncode == 0:
+            logger.info("Successfully downloaded spaCy model")
+            return True
+        else:
+            logger.error(f"Failed to download spaCy model: {result.stderr}")
+            return False
+            
+    except Exception as e:
+        logger.error(f"Failed to download spaCy model: {e}")
+        return False
+
+def verify_models(config: dict = None):
+    """Verify that downloaded models can be loaded"""
+    if not config:
+        config = load_config()
+    
+    logger.info("Verifying model installations...")
+    
+    # Test OntoNotes model
+    try:
+        import tner
+        ontonotes_config = config.get("models", {}).get("entity_typing", {}).get("ontonotes_ner", {})
+        model_path = ontonotes_config.get("local_path", "models/roberta-large-ontonotes5")
+        
+        if Path(model_path).exists():
+            logger.info(f"Testing OntoNotes model from {model_path}")
+            model = tner.TransformersNER(model_path)
+            test_result = model.predict(["test"])
+            logger.info("✓ OntoNotes model loaded successfully")
+        else:
+            logger.warning(f"OntoNotes model not found at {model_path}")
+    except Exception as e:
+        logger.error(f"✗ OntoNotes model test failed: {e}")
+    
+    # Test REBEL model
+    try:
+        from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+        rebel_config = config.get("models", {}).get("information_extraction", {}).get("rebel", {})
+        model_path = rebel_config.get("local_path", "models/rebel-large")
+        
+        if Path(model_path).exists():
+            logger.info(f"Testing REBEL model from {model_path}")
+            tokenizer = AutoTokenizer.from_pretrained(model_path)
+            model = AutoModelForSeq2SeqLM.from_pretrained(model_path)
+            logger.info("✓ REBEL model loaded successfully")
+        else:
+            logger.warning(f"REBEL model not found at {model_path}")
+    except Exception as e:
+        logger.error(f"✗ REBEL model test failed: {e}")
+    
+    # Test spaCy model
+    try:
+        import spacy
+        spacy_config = config.get("models", {}).get("entity_typing", {}).get("spacy_fallback", {})
+        model_name = spacy_config.get("model", "en_core_web_sm")
+        
+        nlp = spacy.load(model_name)
+        doc = nlp("test")
+        logger.info("✓ spaCy model loaded successfully")
+    except Exception as e:
+        logger.error(f"✗ spaCy model test failed: {e}")
 
 def main():
-    """Main entry point for download_models script"""
-    parser = argparse.ArgumentParser(description="SubgraphRAG+ Model Downloader")
-    parser.add_argument("--dir", default=DEFAULT_MODEL_DIR, help="Model directory")
-    parser.add_argument("--force", action="store_true", help="Force download even if models exist")
+    """Main function"""
+    parser = argparse.ArgumentParser(description="Download models for SubgraphRAG+ based on config.json")
+    parser.add_argument("--model", choices=["ontonotes", "rebel", "spacy", "all"], default="all",
+                       help="Which model to download (default: all)")
+    parser.add_argument("--skip-spacy", action="store_true",
+                       help="Skip downloading spaCy model")
+    parser.add_argument("--verify", action="store_true",
+                       help="Verify models after download")
+    parser.add_argument("--config", help="Path to config.json file")
     
     args = parser.parse_args()
     
-    if download_models(args.dir, args.force):
+    # Load configuration
+    if args.config:
+        config_path = Path(args.config)
+        try:
+            with open(config_path, 'r') as f:
+                config = json.load(f)
+        except Exception as e:
+            logger.error(f"Failed to load config from {config_path}: {e}")
+            return 1
+    else:
+        config = load_config()
+    
+    if not config:
+        logger.error("No configuration loaded, cannot proceed")
+        return 1
+    
+    logger.info("Using configuration:")
+    logger.info(f"  OntoNotes: {config.get('models', {}).get('entity_typing', {}).get('ontonotes_ner', {}).get('model', 'N/A')}")
+    logger.info(f"  REBEL: {config.get('models', {}).get('information_extraction', {}).get('rebel', {}).get('model', 'N/A')}")
+    logger.info(f"  spaCy: {config.get('models', {}).get('entity_typing', {}).get('spacy_fallback', {}).get('model', 'N/A')}")
+    
+    success = True
+    
+    # Download models based on selection
+    if args.model in ["ontonotes", "all"]:
+        if not download_ontonotes_model(config):
+            success = False
+    
+    if args.model in ["rebel", "all"]:
+        if not download_rebel_model(config):
+            success = False
+    
+    if args.model in ["spacy", "all"] and not args.skip_spacy:
+        if not download_spacy_model(config):
+            success = False
+    
+    # Verify models if requested
+    if args.verify:
+        verify_models(config)
+    
+    if success:
+        logger.info("All requested models downloaded successfully!")
         return 0
     else:
+        logger.error("Some models failed to download")
         return 1
-
 
 if __name__ == "__main__":
     sys.exit(main())

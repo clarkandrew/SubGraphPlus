@@ -18,4 +18,22 @@
       retries: 3
     restart: unless-stopped
 
+  ner:
+    build:
+      context: .
+      dockerfile: Dockerfile.ner
+    ports:
+      - "8004:8004"
+    environment:
+      - TRANSFORMERS_CACHE=/app/cache/transformers
+      - TRANSFORMERS_OFFLINE=1
+    volumes:
+      - ./cache:/app/cache
+      - ./logs:/app/logs
+    networks:
+      - rag
+    depends_on:
+      - neo4j
+    restart: unless-stopped
+
 # ... existing services ... 

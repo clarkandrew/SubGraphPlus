@@ -139,3 +139,4 @@ ProjectPlan_dev
 .cursor
 TODO.md
 .cursorignore
+models/roberta-large-ontonotes5

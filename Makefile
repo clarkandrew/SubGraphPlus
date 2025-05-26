@@ -72,7 +72,7 @@ setup-all: ## Setup - Complete Docker setup (recommended)
 	@echo "✅ Setup complete! Access: http://localhost:8000/docs"
 
 .PHONY: setup-dev
-setup-dev: ## Setup - Development environment (uses interactive script)
+setup-dev: ner-model ## Setup - Development environment (uses interactive script)
 	@echo "🔧 Running development environment setup..."
 	@./bin/setup_dev.sh
 
@@ -325,6 +325,27 @@ get-pretrained-mlp: ## Setup - Download or create pre-trained MLP model
 	else \
 		echo "✅ Pre-trained MLP model already exists"; \
 	fi
+
+.PHONY: ner-model
+ner-model: ## Setup - Download models for entity typing and information extraction
+	@echo "⏬ Downloading models based on config.json..."
+	@$(VENV_PYTHON) scripts/download_models.py --model all --verify
+
+.PHONY: ner-model-only
+ner-model-only: ## Setup - Download only OntoNotes NER model
+	@echo "⏬ Downloading OntoNotes NER model..."
+	@$(VENV_PYTHON) scripts/download_models.py --model ontonotes --verify
+
+.PHONY: rebel-model
+rebel-model: ## Setup - Download only REBEL model for information extraction
+	@echo "⏬ Downloading REBEL model..."
+	@$(VENV_PYTHON) scripts/download_models.py --model rebel --verify
+
+.PHONY: serve-ner
+serve-ner: ner-model ## Services - Start NER service container
+	@echo "🤖 Starting NER service..."
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) up -d ner
+	@echo "✅ NER service ready!"
 
 .PHONY: dev
 dev: setup-dev neo4j-start migrate-schema serve ## Workflow - Complete development setup and start

@@ -49,6 +49,14 @@ jobs:
         pip install -r requirements.txt
         pip install -r requirements-dev.txt
     
+    - name: NER weights cache
+      run: |
+        python - <<'PY'
+        from pathlib import Path
+        import shutil
+        Path('models/roberta-large-ontonotes5').mkdir(parents=True, exist_ok=True)
+        PY
+    
     - name: Set up environment
       run: |
         mkdir -p data cache logs models config
@@ -121,6 +129,14 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install -r requirements-dev.txt
+    
+    - name: NER weights cache
+      run: |
+        python - <<'PY'
+        from pathlib import Path
+        import shutil
+        Path('models/roberta-large-ontonotes5').mkdir(parents=True, exist_ok=True)
+        PY
     
     - name: Set up environment
       run: |

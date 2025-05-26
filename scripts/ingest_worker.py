@@ -224,7 +224,7 @@ def ingest_triple_to_neo4j(head_text, relation_text, tail_text):
         MERGE (h:Entity {name: $head_text})
         ON CREATE SET h.id = $head_id, h.type = $head_type
         RETURN h.id as head_id
-        """, head_text=head_text, head_id=str(uuid.uuid4()), head_type=detect_entity_type(head_text, context=f"Subject of {relation_text}"))
+        """, head_text=head_text, head_id=str(uuid.uuid4()), head_type=detect_entity_type(head_text))
         head_id = result.single()["head_id"]
         
         # Create tail entity if it doesn't exist
@@ -232,7 +232,7 @@ def ingest_triple_to_neo4j(head_text, relation_text, tail_text):
         MERGE (t:Entity {name: $tail_text})
         ON CREATE SET t.id = $tail_id, t.type = $tail_type
         RETURN t.id as tail_id
-        """, tail_text=tail_text, tail_id=str(uuid.uuid4()), tail_type=detect_entity_type(tail_text, context=f"Object of {relation_text}"))
+        """, tail_text=tail_text, tail_id=str(uuid.uuid4()), tail_type=detect_entity_type(tail_text))
         tail_id = result.single()["tail_id"]
         
         # Create relationship if it doesn't exist

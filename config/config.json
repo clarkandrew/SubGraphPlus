@@ -33,6 +33,37 @@
     },
     "mlp": {
       "model_path": "models/mlp/mlp.pth"
+    },
+    "information_extraction": {
+      "rebel": {
+        "model": "Babelscape/rebel-large",
+        "type": "sequence-to-sequence",
+        "description": "BART-based transformer for open-domain relation extraction",
+        "purpose": "Extracts subject-predicate-object triples from raw text",
+        "local_path": "models/rebel-large",
+        "batch_size": 16,
+        "max_length": 512,
+        "device": "auto"
+      }
+    },
+    "entity_typing": {
+      "ontonotes_ner": {
+        "model": "tner/roberta-large-ontonotes5",
+        "type": "token-classification",
+        "description": "RoBERTa-large fine-tuned for NER on OntoNotes 5.0 dataset",
+        "purpose": "Predicts semantic type/class for entity mentions (18 OntoNotes types)",
+        "local_path": "models/roberta-large-ontonotes5",
+        "batch_size": 32,
+        "device": "auto",
+        "cache_size": 4096
+      },
+      "spacy_fallback": {
+        "model": "en_core_web_sm",
+        "type": "spacy-pipeline",
+        "description": "spaCy English model for fallback NER",
+        "purpose": "Backup entity recognition when OntoNotes model fails",
+        "device": "cpu"
+      }
     }
   },
   "data": {
