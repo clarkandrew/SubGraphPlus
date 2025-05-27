@@ -8,20 +8,20 @@
     "backend": "mlx",
     "llm": {
       "mlx": {
-        "model": "mlx-community/Qwen3-14B-8bit",
-        "max_tokens": 512,
+        "model": "mlx-community/Qwen3-8B-8bit",
+        "max_tokens": 8096,
         "temperature": 0.1,
         "top_p": 0.9
       },
       "openai": {
         "model": "gpt-3.5-turbo",
-        "max_tokens": 512,
+        "max_tokens": 8096,
         "temperature": 0.1,
         "top_p": 0.9
       },
       "huggingface": {
-        "model": "mlx-community/Qwen3-14B-8bit",
-        "max_tokens": 512,
+        "model": "mlx-community/Qwen3-8B-8bit",
+        "max_tokens": 8096,
         "temperature": 0.1,
         "top_p": 0.9
       }

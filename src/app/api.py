@@ -181,43 +181,60 @@ async def health_check():
 
 # Readiness check endpoint
 @app.get("/readyz")
-async def readiness_check():
+async def readiness_check(skip_model_loading: bool = Query(True, description="Skip expensive model loading checks")):
     """Dependency readiness probe"""
     ie_service = get_information_extraction_service()
     
+    # Basic checks (fast)
     checks = {
         "sqlite": sqlite_db.verify_connectivity() if sqlite_db is not None else False,
         "neo4j": neo4j_db.verify_connectivity() if neo4j_db is not None else False,
         "faiss_index": faiss_index.is_trained() if faiss_index is not None else False,
-        "llm_backend": llm_health_check(),
-        "embedder": embedder_health_check(),
-        "rebel_model": ie_service.is_model_loaded()
+        "llm_backend": llm_health_check(),  # Now lightweight
+        "embedder": embedder_health_check(),  # Now lightweight
+        "rebel_service": ie_service.is_service_available()  # Check service, not model loading
     }
+    
+    # Expensive checks (only if requested)
+    if not skip_model_loading:
+        from app.ml.llm import model_readiness_check as llm_readiness
+        from app.ml.embedder import model_readiness_check as embedder_readiness
+        
+        checks.update({
+            "llm_model_loaded": llm_readiness(),
+            "embedder_model_loaded": embedder_readiness(),
+            "rebel_model_loaded": ie_service.is_model_loaded()
+        })
     
     # During testing, consider the service ready even if some components are mocked
     if TESTING:
         return {
             "status": "ready",
-            "checks": {k: "mocked" if not v else "ok" for k, v in checks.items()}
+            "checks": {k: "mocked" if not v else "ok" for k, v in checks.items()},
+            "note": "Testing mode - some checks mocked"
         }
     
-    # If all checks pass, return 200 OK
-    if all(checks.values()):
-        return {
-            "status": "ready",
-            "checks": {k: "ok" for k in checks}
-        }
+    # Calculate status
+    basic_checks = ["sqlite", "neo4j", "faiss_index", "llm_backend", "embedder", "rebel_service"]
+    basic_ready = all(checks.get(k, False) for k in basic_checks)
     
-    # Otherwise, return 503 Service Unavailable with failing checks
-    failed_checks = {k: "failed" for k, v in checks.items() if not v}
-    passed_checks = {k: "ok" for k, v in checks.items() if v}
+    if basic_ready:
+        status_code = 200
+        status = "ready"
+    else:
+        status_code = HTTP_503_SERVICE_UNAVAILABLE
+        status = "not_ready"
+    
+    # Format response
+    response_data = {
+        "status": status,
+        "checks": {k: ("ok" if v else "failed") for k, v in checks.items()},
+        "model_loading_skipped": skip_model_loading
+    }
     
     return JSONResponse(
-        status_code=HTTP_503_SERVICE_UNAVAILABLE,
-        content={
-            "status": "not_ready",
-            "checks": {**passed_checks, **failed_checks}
-        }
+        status_code=status_code,
+        content=response_data
     )
 
 # Prometheus metrics endpoint

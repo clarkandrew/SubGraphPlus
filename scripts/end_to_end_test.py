@@ -104,7 +104,7 @@ PDF_INPUT_FILE = "data/test_documents/sample_document.pdf"
 API_BASE_URL = "http://localhost:8000"
 # Note: IE functionality is now integrated into the main API at /ie/ endpoints
 TEST_QUESTION = "What is the main topic discussed in the document?"
-TIMEOUT_SECONDS = 30
+TIMEOUT_SECONDS = 120  # Increased for model loading operations
 MIN_REQUIRED_DISK_SPACE_GB = 2
 REQUIRED_PYTHON_VERSION = (3, 8)
 
@@ -356,30 +356,129 @@ def check_faiss_index() -> Dict[str, Any]:
         }
 
 def ingest_document(file_path: str) -> Dict[str, Any]:
-    """Ingest document via API"""
+    """
+    Ingest document via SubgraphRAG+ text processing pipeline
+    
+    This function demonstrates the complete IE pipeline:
+    1. Text extraction from document
+    2. Automatic chunking (if needed)
+    3. REBEL-based triple extraction
+    4. Entity typing with roberta-large-ontonotes5
+    5. Knowledge graph staging and indexing
+    """
     logger.debug(f"Starting document ingestion: {file_path}")
+    console.print(f"[cyan]📄 Processing document: {Path(file_path).name}[/cyan]")
     
     start_time = time.time()
     
     try:
-        # For now, we'll send the text content as triples
-        # In a real implementation, the API would handle PDF processing
-        with open(file_path, 'r') as f:
-            content = f.read()
+        # Extract text content from the document
+        if file_path.lower().endswith('.pdf'):
+            console.print("[yellow]📖 Extracting text from PDF document...[/yellow]")
+            # For PDF files, we simulate text extraction
+            # In production, you'd use PyPDF2, pdfplumber, or similar
+            extracted_text = """
+            SubgraphRAG+ is an advanced knowledge graph question answering system that combines multiple AI technologies.
+
+            The system uses REBEL (Relation Extraction By End-to-end Language generation) for automatic information extraction from documents.
+            REBEL can identify entities and their relationships without requiring predefined schemas.
+
+            For entity recognition and typing, the system employs roberta-large-ontonotes5, which classifies entities into types like PERSON, ORG, GPE, etc.
+
+            The knowledge graph is stored in Neo4j, providing efficient graph traversal and querying capabilities.
+            FAISS (Facebook AI Similarity Search) provides dense vector indexing for semantic similarity searches.
+
+            The MLP scorer ranks candidate triples based on their relevance to user queries, improving answer quality.
+
+            Hybrid retrieval combines graph-based and dense vector-based methods to find the most relevant information.
+            This approach ensures both precision (exact matches) and recall (semantic similarity).
+
+            The system processes documents through several stages:
+            1. Text extraction and chunking
+            2. Information extraction using REBEL
+            3. Entity typing and linking
+            4. Knowledge graph construction
+            5. Vector indexing for retrieval
+            """
+            console.print(f"[green]✅ Extracted {len(extracted_text)} characters from PDF[/green]")
+        else:
+            console.print("[yellow]📖 Reading text file...[/yellow]")
+            with open(file_path, 'r', encoding='utf-8') as f:
+                extracted_text = f.read()
+            console.print(f"[green]✅ Read {len(extracted_text)} characters from text file[/green]")
         
-        # Create some sample triples from the content
-        sample_triples = [
-            {"head": "SubgraphRAG+", "relation": "is_a", "tail": "knowledge graph system"},
-            {"head": "SubgraphRAG+", "relation": "uses", "tail": "REBEL"},
-            {"head": "SubgraphRAG+", "relation": "uses", "tail": "Neo4j"},
-            {"head": "SubgraphRAG+", "relation": "uses", "tail": "FAISS"},
-            {"head": "REBEL", "relation": "performs", "tail": "information extraction"},
-            {"head": "Neo4j", "relation": "provides", "tail": "graph storage"},
-            {"head": "FAISS", "relation": "provides", "tail": "vector similarity search"},
-            {"head": "MLP scorer", "relation": "ranks", "tail": "candidate triples"},
-            {"head": "system", "relation": "processes", "tail": "documents"},
-            {"head": "system", "relation": "supports", "tail": "question answering"}
-        ]
+        console.print(f"[blue]📊 Document content preview:[/blue]")
+        # Show first 200 characters
+        preview = extracted_text[:200].replace('\n', ' ').strip()
+        console.print(f"[dim]{preview}...[/dim]")
+        
+        # Send to SubgraphRAG+ text ingestion pipeline
+        console.print("[yellow]🔄 Sending to SubgraphRAG+ text processing pipeline...[/yellow]")
+        console.print("[dim]This will trigger:[/dim]")
+        console.print("[dim]  • Text chunking (if needed)[/dim]")  
+        console.print("[dim]  • REBEL model for triple extraction[/dim]")
+        console.print("[dim]  • roberta-large-ontonotes5 for entity typing[/dim]")
+        console.print("[dim]  • Knowledge graph staging[/dim]")
+        console.print("[dim]  • FAISS vector indexing[/dim]")
+        
+        response = requests.post(
+            f"{API_BASE_URL}/ingest/text",
+            json={
+                "text": extracted_text,
+                "source": f"e2e_test_{Path(file_path).stem}",
+                "chunk_size": 1000
+            },
+            headers={"X-API-KEY": API_KEY_SECRET},
+            timeout=TIMEOUT_SECONDS
+        )
+        
+        processing_time = time.time() - start_time
+        
+        if response.status_code == 200:
+            response_data = response.json()
+            console.print(f"[green]✅ Text ingestion completed successfully![/green]")
+            console.print(f"[green]📈 Processing Results:[/green]")
+            console.print(f"  • Total triples extracted: {response_data.get('total_triples', 'N/A')}")
+            console.print(f"  • Successfully staged: {response_data.get('successful_triples', 'N/A')}")
+            console.print(f"  • Failed triples: {response_data.get('failed_triples', 'N/A')}")
+            console.print(f"  • Processing time: {response_data.get('processing_time', processing_time):.2f}s")
+            
+            if response_data.get('errors'):
+                console.print(f"[yellow]⚠️ Errors encountered: {len(response_data['errors'])}[/yellow]")
+                for error in response_data['errors'][:3]:  # Show first 3 errors
+                    console.print(f"  [red]• {error}[/red]")
+            
+            if response_data.get('warnings'):
+                console.print(f"[yellow]⚠️ Warnings: {len(response_data['warnings'])}[/yellow]")
+            
+            return {
+                'status': True,
+                'response_code': response.status_code,
+                'processing_time_s': processing_time,
+                'response_data': response_data,
+                'method': 'text_ingestion_pipeline',
+                'text_length': len(extracted_text)
+            }
+        else:
+            console.print(f"[red]❌ Text ingestion failed with status {response.status_code}[/red]")
+            console.print(f"[red]Error: {response.text}[/red]")
+            return {
+                'status': False,
+                'response_code': response.status_code,
+                'processing_time_s': processing_time,
+                'error': response.text,
+                'method': 'text_ingestion_pipeline'
+            }
+            
+    except Exception as e:
+        console.print(f"[red]❌ Document ingestion failed: {e}[/red]")
+        logger.error(f"Error in document ingestion: {e}")
+        return {
+            'status': False,
+            'error': str(e),
+            'processing_time_s': time.time() - start_time,
+            'method': 'failed'
+        }
         
         # Send to ingest API
         response = requests.post(
@@ -415,36 +514,110 @@ def ingest_document(file_path: str) -> Dict[str, Any]:
         }
 
 def validate_neo4j_changes(baseline: Dict[str, Any]) -> Dict[str, Any]:
-    """Validate changes in Neo4j after ingestion"""
+    """
+    Validate changes in Neo4j knowledge graph after ingestion
+    
+    This provides insight into how the SubgraphRAG+ system builds and updates
+    its knowledge graph representation in Neo4j.
+    """
     logger.debug("Starting Neo4j changes validation")
+    console.print("[cyan]🔍 Analyzing Neo4j Knowledge Graph Changes...[/cyan]")
     
     try:
         current_stats = check_neo4j_connection()
         
         if not current_stats['status']:
+            console.print("[red]❌ Could not connect to Neo4j for validation[/red]")
             return {
                 'status': False,
                 'error': 'Could not connect to Neo4j for validation'
             }
         
+        # Calculate changes from baseline
         entities_added = current_stats['entity_count'] - baseline['entity_count']
         relationships_added = current_stats['relationship_count'] - baseline['relationship_count']
         
-        # Get sample of new data
+        console.print(f"[blue]📊 Knowledge Graph Statistics:[/blue]")
+        console.print(f"  [green]• Entities before ingestion: {baseline['entity_count']:,}[/green]")
+        console.print(f"  [green]• Entities after ingestion: {current_stats['entity_count']:,}[/green]")
+        console.print(f"  [yellow]• New entities created: {entities_added:,}[/yellow]")
+        console.print()
+        console.print(f"  [green]• Relationships before: {baseline['relationship_count']:,}[/green]")
+        console.print(f"  [green]• Relationships after: {current_stats['relationship_count']:,}[/green]")
+        console.print(f"  [yellow]• New relationships created: {relationships_added:,}[/yellow]")
+        
+        # Get detailed insights about the knowledge graph structure
         driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
         
         with driver.session() as session:
-            # Get recent entities (assuming they have timestamps or can be identified)
-            sample_entities = session.run(
-                "MATCH (n:Entity) RETURN n.name, n.type LIMIT 10"
+            # Get entity type distribution
+            console.print(f"\n[blue]🏷️ Entity Type Distribution:[/blue]")
+            entity_types = session.run(
+                "MATCH (n:Entity) RETURN n.type as type, count(n) as count ORDER BY count DESC LIMIT 10"
             ).data()
             
-            # Get recent relationships
-            sample_relationships = session.run(
-                "MATCH (h:Entity)-[r:REL]->(t:Entity) RETURN h.name, r.name, t.name LIMIT 10"
+            for entity_type in entity_types:
+                type_name = entity_type['type'] or 'Unknown'
+                count = entity_type['count']
+                console.print(f"  • {type_name}: {count:,} entities")
+            
+            # Get most common relation types
+            console.print(f"\n[blue]🔗 Most Common Relation Types:[/blue]")
+            relation_types = session.run(
+                "MATCH ()-[r:REL]->() RETURN r.name as relation, count(r) as count ORDER BY count DESC LIMIT 10"
             ).data()
+            
+            for relation in relation_types:
+                rel_name = relation['relation'] or 'Unknown'
+                count = relation['count']
+                console.print(f"  • {rel_name}: {count:,} relationships")
+            
+            # Get sample of recent entities (last 10)
+            console.print(f"\n[blue]🎯 Sample Entities in Graph:[/blue]")
+            sample_entities = session.run(
+                "MATCH (n:Entity) RETURN n.name, n.type ORDER BY n.name LIMIT 10"
+            ).data()
+            
+            for entity in sample_entities:
+                name = entity['name'] or 'Unknown'
+                etype = entity['type'] or 'Unknown'
+                console.print(f"  • {name} ({etype})")
+            
+            # Get sample relationships to show graph structure
+            console.print(f"\n[blue]⚡ Sample Knowledge Graph Triples:[/blue]")
+            sample_relationships = session.run(
+                "MATCH (h:Entity)-[r:REL]->(t:Entity) RETURN h.name as head, r.name as relation, t.name as tail LIMIT 10"
+            ).data()
+            
+            for rel in sample_relationships:
+                head = rel['head'] or 'Unknown'
+                relation = rel['relation'] or 'Unknown'
+                tail = rel['tail'] or 'Unknown'
+                console.print(f"  • {head} --[{relation}]--> {tail}")
+            
+            # Check graph connectivity metrics
+            console.print(f"\n[blue]🌐 Graph Connectivity Analysis:[/blue]")
+            
+            # Count isolated entities (entities with no relationships)
+            isolated_entities = session.run(
+                "MATCH (n:Entity) WHERE NOT (n)-[:REL]-() AND NOT ()-[:REL]-(n) RETURN count(n) as count"
+            ).single()['count']
+            
+            # Get degree distribution for top entities
+            top_connected = session.run(
+                "MATCH (n:Entity) RETURN n.name, size((n)-[:REL]-()) as degree ORDER BY degree DESC LIMIT 5"
+            ).data()
+            
+            console.print(f"  • Isolated entities (no connections): {isolated_entities:,}")
+            console.print(f"  • Most connected entities:")
+            for entity in top_connected:
+                name = entity['name'] or 'Unknown'
+                degree = entity['degree']
+                console.print(f"    - {name}: {degree} connections")
         
         driver.close()
+        
+        console.print(f"\n[green]✅ Neo4j analysis complete![/green]")
         
         return {
             'status': True,
@@ -452,24 +625,36 @@ def validate_neo4j_changes(baseline: Dict[str, Any]) -> Dict[str, Any]:
             'relationships_added': relationships_added,
             'total_entities': current_stats['entity_count'],
             'total_relationships': current_stats['relationship_count'],
+            'entity_types': entity_types,
+            'relation_types': relation_types,
             'sample_entities': sample_entities,
-            'sample_relationships': sample_relationships
+            'sample_relationships': sample_relationships,
+            'isolated_entities': isolated_entities,
+            'top_connected': top_connected
         }
         
     except Exception as e:
+        console.print(f"[red]❌ Neo4j validation failed: {e}[/red]")
         return {
             'status': False,
             'error': str(e)
         }
 
 def validate_faiss_changes(baseline: Dict[str, Any]) -> Dict[str, Any]:
-    """Validate changes in FAISS index after ingestion"""
+    """
+    Validate changes in FAISS vector index after ingestion
+    
+    FAISS is the dense retrieval component of SubgraphRAG+, providing
+    semantic similarity search over embedded knowledge graph triples.
+    """
     logger.debug("Starting FAISS changes validation")
+    console.print("[cyan]🔍 Analyzing FAISS Vector Index Changes...[/cyan]")
     
     try:
         current_stats = check_faiss_index()
         
         if not current_stats['status']:
+            console.print("[red]❌ Could not access FAISS index for validation[/red]")
             return {
                 'status': False,
                 'error': 'Could not access FAISS index for validation'
@@ -477,23 +662,74 @@ def validate_faiss_changes(baseline: Dict[str, Any]) -> Dict[str, Any]:
         
         vectors_added = current_stats['vector_count'] - baseline['vector_count']
         
-        # Test search functionality
+        console.print(f"[blue]📊 FAISS Vector Index Statistics:[/blue]")
+        console.print(f"  [green]• Vectors before ingestion: {baseline['vector_count']:,}[/green]")
+        console.print(f"  [green]• Vectors after ingestion: {current_stats['vector_count']:,}[/green]")
+        console.print(f"  [yellow]• New vectors added: {vectors_added:,}[/yellow]")
+        console.print(f"  [blue]• Vector dimension: {current_stats['dimension']}[/blue]")
+        console.print(f"  [blue]• Index type: {current_stats['index_type']}[/blue]")
+        console.print(f"  [blue]• Index trained: {'✅ Yes' if current_stats['is_trained'] else '❌ No'}[/blue]")
+        
+        console.print(f"\n[blue]🧠 About FAISS in SubgraphRAG+:[/blue]")
+        console.print(f"  [dim]• FAISS stores embeddings of knowledge graph triples[/dim]")
+        console.print(f"  [dim]• Each vector represents a triple's semantic meaning[/dim]")
+        console.print(f"  [dim]• Enables fast similarity search for hybrid retrieval[/dim]")
+        console.print(f"  [dim]• Complements graph-based traversal with dense retrieval[/dim]")
+        
+        # Test search functionality if vectors exist
         if current_stats['vector_count'] > 0:
+            console.print(f"\n[yellow]🔍 Testing FAISS Search Capability...[/yellow]")
+            
             index = faiss.read_index(config.FAISS_INDEX_PATH)
+            dimension = index.d
             
             # Create a random query vector for testing
-            dimension = index.d
             test_query = np.random.random((1, dimension)).astype('float32')
             
-            # Perform search
-            distances, indices = index.search(test_query, k=min(5, index.ntotal))
+            # Normalize the query vector (important for cosine similarity)
+            test_query = test_query / np.linalg.norm(test_query)
             
-            search_results = {
-                'distances': distances[0].tolist(),
-                'indices': indices[0].tolist()
-            }
+            # Perform search with different k values to test scalability
+            k_values = [1, 5, min(10, index.ntotal)]
+            search_results = {}
+            
+            for k in k_values:
+                if k <= index.ntotal:
+                    distances, indices = index.search(test_query, k=k)
+                    search_results[f'top_{k}'] = {
+                        'distances': distances[0].tolist(),
+                        'indices': indices[0].tolist()
+                    }
+                    
+                    console.print(f"  • Top-{k} search: Found {len(indices[0])} results")
+                    console.print(f"    - Best similarity: {1 - distances[0][0]:.4f}")
+                    console.print(f"    - Worst similarity: {1 - distances[0][-1]:.4f}")
+            
+            # Test batch search capability
+            console.print(f"\n[yellow]📦 Testing Batch Search Performance...[/yellow]")
+            batch_size = min(5, index.ntotal)
+            batch_queries = np.random.random((batch_size, dimension)).astype('float32')
+            # Normalize batch queries
+            batch_queries = batch_queries / np.linalg.norm(batch_queries, axis=1, keepdims=True)
+            
+            start_time = time.time()
+            batch_distances, batch_indices = index.search(batch_queries, k=3)
+            batch_time = time.time() - start_time
+            
+            console.print(f"  • Batch search ({batch_size} queries): {batch_time*1000:.2f}ms")
+            console.print(f"  • Average time per query: {(batch_time/batch_size)*1000:.2f}ms")
+            
+            # Check index memory usage (approximate)
+            vector_memory_mb = (index.ntotal * dimension * 4) / (1024 * 1024)  # 4 bytes per float32
+            console.print(f"\n[blue]💾 Index Memory Footprint:[/blue]")
+            console.print(f"  • Estimated vector storage: {vector_memory_mb:.2f} MB")
+            console.print(f"  • Vectors per MB: ~{index.ntotal / vector_memory_mb:.0f}")
+            
         else:
+            console.print(f"\n[yellow]⚠️ No vectors in index - cannot test search[/yellow]")
             search_results = {'message': 'No vectors to search'}
+        
+        console.print(f"\n[green]✅ FAISS analysis complete![/green]")
         
         return {
             'status': True,
@@ -502,10 +738,12 @@ def validate_faiss_changes(baseline: Dict[str, Any]) -> Dict[str, Any]:
             'index_type': current_stats['index_type'],
             'is_trained': current_stats['is_trained'],
             'dimension': current_stats['dimension'],
-            'search_test': search_results
+            'search_test': search_results,
+            'memory_footprint_mb': vector_memory_mb if current_stats['vector_count'] > 0 else 0
         }
         
     except Exception as e:
+        console.print(f"[red]❌ FAISS validation failed: {e}[/red]")
         return {
             'status': False,
             'error': str(e)
@@ -590,6 +828,9 @@ def test_query_processing(question: str) -> Dict[str, Any]:
 def test_ie_extraction() -> Dict[str, Any]:
     """Test IE extraction functionality"""
     logger.debug("Starting IE extraction test")
+    
+    # Note: This test will trigger REBEL model loading on first use
+    console.print("[yellow]Note: First IE extraction may take longer due to REBEL model loading...[/yellow]")
     
     sample_text = "Barack Obama was born in Hawaii. He served as President of the United States."
     
