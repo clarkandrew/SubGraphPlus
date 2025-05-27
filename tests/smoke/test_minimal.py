@@ -10,21 +10,8 @@ sys.path.append(str(Path(__file__).parent.parent))
 # Set environment variable to disable model loading
 os.environ['TESTING'] = '1'
 
-# Mock all the heavy dependencies before any imports
-mock_modules = {
-    'mlx': MagicMock(),
-    'mlx.core': MagicMock(),
-    'mlx.nn': MagicMock(),
-    'mlx_lm': MagicMock(),
-    'torch': MagicMock(),
-    'torch.nn': MagicMock(),
-    'faiss': MagicMock(),
-    'transformers': MagicMock(),
-}
-
-# Patch sys.modules to prevent actual imports
-for module_name, mock_module in mock_modules.items():
-    sys.modules[module_name] = mock_module
+# Don't mock any modules globally as it breaks other tests
+# Instead, use targeted mocking within the test context
 
 # Mock the config to prevent model loading
 with patch('src.app.config.config') as mock_config:

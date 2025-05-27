@@ -1,0 +1,46 @@
+{
+  "mock_responses": {
+    "basic": "Mock LLM response for testing",
+    "error": "Error: Unable to generate response",
+    "empty": "",
+    "health_check": "health check passed"
+  },
+  "response_patterns": {
+    "capital_france": ["Paris", "paris", "France", "capital"],
+    "machine_learning": ["machine learning", "ML", "artificial intelligence", "AI", "algorithm", "data"],
+    "math_2_plus_2": ["4", "four", "2+2=4", "equals 4"],
+    "artificial_intelligence": ["AI", "artificial intelligence", "computer", "intelligence", "machine"],
+    "renewable_energy": ["renewable", "energy", "solar", "wind", "clean", "sustainable"]
+  },
+  "quality_checks": {
+    "min_length": 5,
+    "max_length": 1000,
+    "forbidden_words": ["error", "failed", "exception"],
+    "required_structure": {
+      "has_content": true,
+      "is_string": true,
+      "not_empty": true
+    }
+  },
+  "performance_expectations": {
+    "max_response_time_seconds": 30.0,
+    "max_memory_increase_mb": 100,
+    "min_success_rate_percent": 95.0,
+    "max_concurrent_requests": 10,
+    "max_latency_under_load_seconds": 5.0
+  },
+  "backend_specific": {
+    "mlx": {
+      "expected_model": "mlx-community/Qwen3-14B-8bit",
+      "cache_location": "/Users/andrewclark/.cache/huggingface/hub/models--mlx-community--Qwen3-14B-8bit"
+    },
+    "openai": {
+      "expected_model": "gpt-3.5-turbo",
+      "api_required": true
+    },
+    "huggingface": {
+      "expected_model": "mlx-community/Qwen3-14B-8bit",
+      "transformers_required": true
+    }
+  }
+} 

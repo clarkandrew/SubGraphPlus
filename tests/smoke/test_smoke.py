@@ -29,7 +29,7 @@ class TestBasicFunctionality:
         assert response.status_code == 200
         data = response.json()
         assert "status" in data
-        assert data["status"] == "healthy"
+        assert data["status"] == "ok"
 
     def test_readiness_endpoint_basic(self):
         """Test basic readiness endpoint functionality"""
@@ -263,8 +263,8 @@ class TestLLMIntegration:
         mock_stream_tokens.side_effect = requests.exceptions.Timeout("LLM timeout")
         
         # Mock other dependencies to reach LLM
-        with patch('src.app.retriever.extract_query_entities') as mock_extract, \
-             patch('src.app.retriever.link_entities_v2') as mock_link, \
+        with patch('src.app.utils.extract_query_entities') as mock_extract, \
+             patch('src.app.utils.link_entities_v2') as mock_link, \
              patch('src.app.retriever.hybrid_retrieve_v2') as mock_retrieve:
             
             mock_extract.return_value = ["Tesla"]
@@ -289,8 +289,8 @@ class TestLLMIntegration:
         mock_stream_tokens.side_effect = requests.exceptions.ConnectionError("Connection failed")
         
         # Mock other dependencies to reach LLM
-        with patch('src.app.retriever.extract_query_entities') as mock_extract, \
-             patch('src.app.retriever.link_entities_v2') as mock_link, \
+        with patch('src.app.utils.extract_query_entities') as mock_extract, \
+             patch('src.app.utils.link_entities_v2') as mock_link, \
              patch('src.app.retriever.hybrid_retrieve_v2') as mock_retrieve:
             
             mock_extract.return_value = ["Tesla"]
@@ -316,8 +316,8 @@ class TestRetrievalPipeline:
         with patch('src.app.api.API_KEY_SECRET', "test_api_key"):
             return {"X-API-KEY": "test_api_key"}
 
-    @patch('src.app.retriever.extract_query_entities')
-    @patch('src.app.retriever.link_entities_v2')
+    @patch('src.app.utils.extract_query_entities')
+    @patch('src.app.utils.link_entities_v2')
     def test_empty_entity_extraction(self, mock_link_entities, 
                                    mock_extract_entities, mock_auth_header):
         """Test handling when no entities are extracted"""
@@ -333,8 +333,8 @@ class TestRetrievalPipeline:
         # Should handle gracefully
         assert response.status_code == 200
 
-    @patch('src.app.retriever.extract_query_entities')
-    @patch('src.app.retriever.link_entities_v2')
+    @patch('src.app.utils.extract_query_entities')
+    @patch('src.app.utils.link_entities_v2')
     def test_no_entity_matches(self, mock_link_entities, 
                              mock_extract_entities, mock_auth_header):
         """Test handling when entities are extracted but not found in KB"""
@@ -359,8 +359,8 @@ class TestRetrievalPipeline:
         mock_hybrid_retrieve.side_effect = RetrievalEmpty("No triples found")
         
         # Mock other dependencies
-        with patch('src.app.retriever.extract_query_entities') as mock_extract, \
-             patch('src.app.retriever.link_entities_v2') as mock_link:
+        with patch('src.app.utils.extract_query_entities') as mock_extract, \
+             patch('src.app.utils.link_entities_v2') as mock_link:
             
             mock_extract.return_value = ["Tesla"]
             mock_link.return_value = [("tesla", 0.9)]

@@ -1,0 +1,48 @@
+{
+  "basic_prompts": [
+    "What is the capital of France?",
+    "Explain machine learning in one sentence.",
+    "What is 2 + 2?",
+    "Define artificial intelligence.",
+    "List three benefits of renewable energy."
+  ],
+  "complex_prompts": [
+    "Explain the relationship between quantum computing and cryptography, including potential implications for data security.",
+    "Compare and contrast the advantages and disadvantages of renewable energy sources versus fossil fuels in the context of global climate change.",
+    "Describe the process of photosynthesis and its role in the carbon cycle, including the molecular mechanisms involved.",
+    "Analyze the economic factors that led to the 2008 financial crisis and discuss the regulatory changes implemented afterward.",
+    "Explain the concept of machine learning, including supervised and unsupervised learning, and provide examples of real-world applications."
+  ],
+  "context_prompts": [
+    {
+      "context": "The sky is blue during the day due to Rayleigh scattering.",
+      "question": "What color is the sky during the day and why?"
+    },
+    {
+      "context": "Paris is the capital and largest city of France, located in the north-central part of the country.",
+      "question": "What is the capital of France?"
+    },
+    {
+      "context": "Machine learning is a subset of artificial intelligence that enables computers to learn and improve from experience without being explicitly programmed.",
+      "question": "What is machine learning?"
+    }
+  ],
+  "edge_case_prompts": [
+    "",
+    "a",
+    "What is the meaning of life, the universe, and everything according to Douglas Adams' 'The Hitchhiker's Guide to the Galaxy', and how does this relate to the philosophical concept of existentialism and the search for meaning in an apparently meaningless universe?",
+    "!@#$%^&*()_+-=[]{}|;':\",./<>?",
+    "Translate this text to French: Hello, how are you today?"
+  ],
+  "performance_prompts": [
+    "Quick test",
+    "Medium length prompt for testing response times and system performance under normal load conditions.",
+    "This is a longer prompt designed to test the system's ability to handle more complex inputs that require more processing time and resources. It includes multiple sentences and covers various topics to ensure comprehensive testing of the language model's capabilities and response generation mechanisms."
+  ],
+  "streaming_prompts": [
+    "Count from 1 to 10.",
+    "Tell me a short story about a robot.",
+    "Explain the water cycle step by step.",
+    "List the planets in our solar system in order from the sun."
+  ]
+} 

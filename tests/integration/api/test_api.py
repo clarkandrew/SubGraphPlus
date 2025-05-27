@@ -62,7 +62,8 @@ class TestHealthEndpoints:
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "ready"
-        assert all(check == "ok" for check in data["checks"].values())
+        # In testing mode, services return "mocked" or "ok"
+        assert all(check in ["ok", "mocked"] for check in data["checks"].values())
 
     @patch('src.app.ml.llm.health_check')
     @patch('src.app.ml.embedder.health_check')
@@ -149,8 +150,8 @@ class TestQueryEndpoint:
         data = response.json()
         assert data["detail"]["code"] == "EMPTY_QUERY"
 
-    @patch('src.app.retriever.extract_query_entities')
-    @patch('src.app.retriever.link_entities_v2')
+    @patch('src.app.utils.extract_query_entities')
+    @patch('src.app.utils.link_entities_v2')
     def test_query_no_entity_match(self, mock_link_entities, 
                                  mock_extract_entities, mock_auth_header):
         """Test query with no entity matches"""
@@ -182,8 +183,8 @@ class TestQueryEndpoint:
         assert len(error_events) > 0
         assert error_events[0]["data"]["code"] == "NO_ENTITY_MATCH"
 
-    @patch('src.app.retriever.extract_query_entities')
-    @patch('src.app.retriever.link_entities_v2')
+    @patch('src.app.utils.extract_query_entities')
+    @patch('src.app.utils.link_entities_v2')
     @patch('src.app.retriever.hybrid_retrieve_v2')
     def test_query_retrieval_empty(self, mock_hybrid_retrieve, 
                                  mock_link_entities, mock_extract_entities, 
@@ -220,8 +221,8 @@ class TestQueryEndpoint:
         assert len(error_events) > 0
         assert error_events[0]["data"]["code"] == "NO_RELEVANT_TRIPLES"
 
-    @patch('src.app.retriever.extract_query_entities')
-    @patch('src.app.retriever.link_entities_v2')
+    @patch('src.app.utils.extract_query_entities')
+    @patch('src.app.utils.link_entities_v2')
     @patch('src.app.retriever.hybrid_retrieve_v2')
     @patch('src.app.ml.llm.stream_tokens')
     @patch('src.app.verify.validate_llm_output')

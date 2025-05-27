@@ -11,31 +11,14 @@ os.environ['DISABLE_MODELS'] = '1'
 # Add parent directory to path
 sys.path.append(str(Path(__file__).parent.parent))
 
-# Mock ALL the problematic modules before any imports
-mock_modules = {
-    'mlx': MagicMock(),
-    'mlx.core': MagicMock(),
-    'mlx.nn': MagicMock(),
-    'mlx_lm': MagicMock(),
-    'torch': MagicMock(),
-    'torch.nn': MagicMock(),
-    'torch.nn.functional': MagicMock(),
-    'faiss': MagicMock(),
-    'transformers': MagicMock(),
-    'tiktoken': MagicMock(),
-    'neo4j': MagicMock(),
-}
-
-for module_name, mock_module in mock_modules.items():
-    sys.modules[module_name] = mock_module
+# Don't mock any modules globally as it breaks other tests
+# Instead, use targeted mocking within the test context
 
 # Mock all database and model loading before importing anything
 with patch('src.app.database.neo4j_db') as mock_neo4j_db, \
      patch('src.app.database.sqlite_db') as mock_sqlite_db, \
      patch('src.app.retriever.faiss_index') as mock_faiss, \
-     patch('src.app.retriever.mlp_model', None), \
-     patch('src.app.ml.embedder.model', None), \
-     patch('src.app.ml.llm.model', None):
+     patch('src.app.retriever.mlp_model', None):
     
     # Configure database mocks
     mock_neo4j_db.verify_connectivity.return_value = False
