@@ -1,22 +1,5 @@
 # ... existing services ...
-
-  ie-service:
-    build:
-      context: .
-      dockerfile: Dockerfile.ie
-    ports:
-      - "8003:8003"
-    environment:
-      - TRANSFORMERS_CACHE=/app/cache/transformers
-    volumes:
-      - ./cache:/app/cache
-      - ./logs:/app/logs
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    restart: unless-stopped
+# Note: IE service functionality is now integrated into the main API
 
   ner:
     build:

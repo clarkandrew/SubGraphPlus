@@ -2,63 +2,66 @@
 
 ## Overview
 
-The SubgraphRAG+ Information Extraction (IE) Service provides production-grade triple extraction and entity typing capabilities. It combines REBEL relation extraction with a sophisticated schema-first entity typing system.
+The SubgraphRAG+ Information Extraction (IE) functionality provides production-grade triple extraction and entity typing capabilities. It combines REBEL relation extraction with a sophisticated schema-first entity typing system, now integrated into the unified API.
 
 ## Architecture
 
 ```
-Raw Text → REBEL IE Service → Triples → Entity Typing → Knowledge Graph
+Raw Text → Unified API (IE Module) → Triples → Entity Typing → Knowledge Graph
 ```
 
 ### Components
 
-1. **REBEL IE Service**: FastAPI microservice for relation extraction
+1. **Unified API IE Module**: Integrated REBEL functionality within the main API
 2. **Entity Typing Service**: Schema-first typing with NER fallback
 3. **Triple Processing Pipeline**: Centralized processing and validation
 
-## REBEL IE Service
+## Unified API IE Module
 
 ### Setup and Deployment
 
 #### Docker Deployment
 
 ```bash
-# Build IE service container
-docker build -f Dockerfile.ie -t subgraphrag-ie .
+# Build unified API container (includes IE functionality)
+docker build -t subgraphrag-unified .
 
-# Run IE service
-docker run -p 8003:8003 subgraphrag-ie
+# Run unified API (IE functionality included)
+docker run -p 8000:8000 subgraphrag-unified
 
 # Or use docker-compose
-docker-compose up ie-service
+docker-compose up api
 ```
 
 #### Manual Setup
 
 ```bash
-# Install dependencies
-pip install transformers torch
+# Install dependencies (includes transformers)
+pip install -r requirements.txt
 
 # Download REBEL model (first run only)
 python -c "from transformers import AutoModelForSeq2SeqLM; AutoModelForSeq2SeqLM.from_pretrained('Babelscape/rebel-large')"
 
-# Start service
-uvicorn src.app.ie_service:app --host 0.0.0.0 --port 8003
+# Start unified API service (IE functionality included)
+uvicorn src.app.api:app --host 0.0.0.0 --port 8000
 ```
 
 ### API Reference
 
-#### POST /extract
+#### POST /ie/extract
 
-Extract triples from raw text using REBEL.
+Extract triples from raw text using REBEL (requires API key).
 
 **Request:**
-```json
-{
-  "text": "Jesus was born in Bethlehem and later lived in Nazareth.",
-  "max_length": 256,
-  "num_beams": 3
-}
+```bash
+curl -X POST http://localhost:8000/ie/extract \
+  -H "Content-Type: application/json" \
+  -H "X-API-KEY: your-api-key" \
+  -d '{
+    "text": "Jesus was born in Bethlehem and later lived in Nazareth.",
+    "max_length": 256,
+    "num_beams": 3
+  }'
 ```
 
 **Response:**
@@ -68,46 +71,47 @@ Extract triples from raw text using REBEL.
     {
       "head": "Jesus",
       "relation": "place of birth", 
-      "tail": "Bethlehem"
+      "tail": "Bethlehem",
+      "confidence": 1.0
     },
     {
       "head": "Jesus",
       "relation": "residence",
-      "tail": "Nazareth"
+      "tail": "Nazareth",
+      "confidence": 1.0
     }
   ],
-  "processing_time": 0.234,
-  "model_info": {
-    "model": "Babelscape/rebel-large",
-    "version": "1.0"
-  }
+  "raw_output": "<s><triplet> Jesus <subj> Bethlehem <obj> place of birth <triplet> Jesus <subj> Nazareth <obj> residence</s>",
+  "processing_time": 0.234
 }
 ```
 
-#### GET /health
+#### GET /ie/health
 
-Health check endpoint.
+Health check endpoint for IE functionality (no authentication required).
 
 **Response:**
 ```json
 {
   "status": "healthy",
-  "model_loaded": true,
-  "uptime": 3600
+  "model": "Babelscape/rebel-large",
+  "model_loaded": true
 }
 ```
 
-#### GET /info
+#### GET /ie/info
 
-Service information.
+IE module information (no authentication required).
 
 **Response:**
 ```json
 {
-  "service": "REBEL IE Service",
-  "version": "1.0.0",
-  "model": "Babelscape/rebel-large",
-  "capabilities": ["relation_extraction", "triple_extraction"]
+  "model_name": "Babelscape/rebel-large",
+  "description": "Relation Extraction By End-to-end Language generation",
+  "capabilities": ["open_schema_relation_extraction", "multilingual_support"],
+  "input_format": "raw_text",
+  "output_format": "head_relation_tail_triples",
+  "service": "SubgraphRAG+ Unified API - IE Module"
 }
 ```
 

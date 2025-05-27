@@ -36,6 +36,10 @@ from app.verify import validate_llm_output, format_prompt
 from app.ml.embedder import health_check as embedder_health_check
 from app.ml.llm import generate_answer, stream_tokens, health_check as llm_health_check
 
+# Import services
+from app.services.information_extraction import get_information_extraction_service
+from app.services.ingestion import get_ingestion_service
+
 # RULE:import-rich-logger-correctly - Use centralized rich logger
 from .log import logger, log_and_print
 from rich.console import Console
@@ -43,11 +47,42 @@ from rich.console import Console
 # Initialize rich console for pretty CLI output
 console = Console()
 
+# API Models for Information Extraction
+class ExtractRequest(BaseModel):
+    text: str
+    max_length: int = 256
+    num_beams: int = 3
+
+class IETriple(BaseModel):
+    head: str
+    relation: str
+    tail: str
+    confidence: float = 1.0
+
+class ExtractResponse(BaseModel):
+    triples: List[IETriple]
+    raw_output: str
+    processing_time: float
+
+# Text ingestion models
+class TextIngestRequest(BaseModel):
+    text: str
+    source: str = "api_input"
+    chunk_size: int = 1000
+
+class TextIngestResponse(BaseModel):
+    total_triples: int
+    successful_triples: int
+    failed_triples: int
+    processing_time: float
+    errors: List[str]
+    warnings: List[str]
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler"""
     # Startup
-    logger.info("Starting SubgraphRAG+ API server")
+    logger.info("Starting SubgraphRAG+ Unified API server")
     
     # Create directories if they don't exist
     os.makedirs("data", exist_ok=True)
@@ -57,10 +92,16 @@ async def lifespan(app: FastAPI):
     # Initialize metrics
     instrumentator.expose(app)
     
+    # Initialize services (but don't preload models)
+    logger.info("Initializing services...")
+    ie_service = get_information_extraction_service()
+    ingestion_service = get_ingestion_service()
+    logger.info("Services initialized")
+    
     yield
     
     # Shutdown
-    logger.info("Shutting down SubgraphRAG+ API server")
+    logger.info("Shutting down SubgraphRAG+ Unified API server")
     
     # Close database connections
     from app.database import close_connections
@@ -68,8 +109,8 @@ async def lifespan(app: FastAPI):
 
 # Create FastAPI app with lifespan
 app = FastAPI(
-    title="SubgraphRAG+ API",
-    description="Advanced knowledge graph question answering with hybrid retrieval",
+    title="SubgraphRAG+ Unified API",
+    description="Advanced knowledge graph question answering with hybrid retrieval and information extraction",
     version="1.0.0",
     lifespan=lifespan
 )
@@ -93,7 +134,7 @@ api_key_header = APIKeyHeader(name="X-API-KEY", auto_error=False)
 async def get_api_key(request: Request, api_key: str = Depends(api_key_header)) -> str:
     """Validate API key"""
     # Skip authentication for health check endpoints
-    if request.url.path in ["/healthz", "/readyz", "/metrics"]:
+    if request.url.path in ["/healthz", "/readyz", "/metrics", "/ie/health", "/ie/info"]:
         return ""
     
     if not api_key:
@@ -142,12 +183,15 @@ async def health_check():
 @app.get("/readyz")
 async def readiness_check():
     """Dependency readiness probe"""
+    ie_service = get_information_extraction_service()
+    
     checks = {
         "sqlite": sqlite_db.verify_connectivity() if sqlite_db is not None else False,
         "neo4j": neo4j_db.verify_connectivity() if neo4j_db is not None else False,
         "faiss_index": faiss_index.is_trained() if faiss_index is not None else False,
         "llm_backend": llm_health_check(),
-        "embedder": embedder_health_check()
+        "embedder": embedder_health_check(),
+        "rebel_model": ie_service.is_model_loaded()
     }
     
     # During testing, consider the service ready even if some components are mocked
@@ -181,6 +225,136 @@ async def readiness_check():
 async def metrics():
     """Prometheus metrics"""
     return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
+# Information Extraction Endpoints
+@app.post("/ie/extract", response_model=ExtractResponse)
+async def extract_triples(
+    request: ExtractRequest,
+    api_key: str = Depends(get_api_key)
+):
+    """
+    Extract triples from input text using REBEL
+    
+    Args:
+        request: ExtractRequest with text and optional parameters
+        
+    Returns:
+        ExtractResponse with extracted triples and metadata
+    """
+    logger.debug("Starting IE triple extraction API request")
+    
+    try:
+        # Delegate to information extraction service
+        ie_service = get_information_extraction_service()
+        result = ie_service.extract_triples(
+            text=request.text,
+            max_length=request.max_length,
+            num_beams=request.num_beams
+        )
+        
+        if not result.success:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Extraction failed: {result.error_message}"
+            )
+        
+        # Convert to API response format
+        triples = [
+            IETriple(
+                head=t['head'],
+                relation=t['relation'],
+                tail=t['tail'],
+                confidence=t['confidence']
+            )
+            for t in result.triples
+        ]
+        
+        return ExtractResponse(
+            triples=triples,
+            raw_output=result.raw_output,
+            processing_time=result.processing_time
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        # RULE:rich-error-handling-required
+        logger.error(f"Error in extract triples API: {e}")
+        console.print_exception()
+        raise HTTPException(500, f"Extraction failed: {e}")
+
+@app.get("/ie/health")
+async def ie_health_check():
+    """Health check endpoint for IE functionality"""
+    try:
+        ie_service = get_information_extraction_service()
+        model_info = ie_service.get_model_info()
+        
+        return {
+            "status": "healthy" if model_info["loaded"] else "unhealthy",
+            "model": model_info["model_name"],
+            "model_loaded": model_info["loaded"]
+        }
+    except Exception as e:
+        # RULE:rich-error-handling-required
+        logger.error(f"IE health check error: {e}")
+        return {"status": "unhealthy", "reason": str(e)}
+
+@app.get("/ie/info")
+async def ie_model_info():
+    """Get Information Extraction model information"""
+    try:
+        ie_service = get_information_extraction_service()
+        model_info = ie_service.get_model_info()
+        
+        return {
+            **model_info,
+            "service": "SubgraphRAG+ Unified API - IE Module"
+        }
+    except Exception as e:
+        # RULE:rich-error-handling-required
+        logger.error(f"Error getting IE model info: {e}")
+        raise HTTPException(500, f"Failed to get model info: {e}")
+
+# Text Ingestion Endpoint
+@app.post("/ingest/text", response_model=TextIngestResponse)
+async def ingest_text(
+    request: TextIngestRequest,
+    api_key: str = Depends(get_api_key)
+):
+    """
+    Ingest raw text content through the full IE and staging pipeline
+    
+    Args:
+        request: TextIngestRequest with text content and parameters
+        
+    Returns:
+        TextIngestResponse with processing statistics
+    """
+    logger.info(f"Text ingestion request: {len(request.text)} characters")
+    
+    try:
+        # Delegate to ingestion service
+        ingestion_service = get_ingestion_service()
+        result = ingestion_service.process_text_content(
+            text=request.text,
+            source=request.source
+        )
+        
+        return TextIngestResponse(
+            total_triples=result.total_triples,
+            successful_triples=result.successful_triples,
+            failed_triples=result.failed_triples,
+            processing_time=result.processing_time,
+            errors=result.errors,
+            warnings=result.warnings
+        )
+        
+    except Exception as e:
+        # RULE:rich-error-handling-required
+        logger.error(f"Error in text ingestion API: {e}")
+        console.print_exception()
+        raise HTTPException(500, f"Text ingestion failed: {e}")
 
 # Query endpoint
 @app.post("/query")
@@ -486,14 +660,14 @@ async def graph_browse(
             }
         )
 
-# Ingest endpoint
+# Triple batch ingest endpoint
 @app.post("/ingest")
 async def ingest(
     request: IngestRequest,
     api_key: str = Depends(get_api_key)
 ):
     """
-    Batch ingest triples into the knowledge graph
+    Batch ingest pre-extracted triples into the knowledge graph
     """
     logger.info(f"Ingest request: {len(request.triples)} triples")
     
@@ -508,47 +682,19 @@ async def ingest(
                 }
             )
         
-        # Prepare triples for staging
-        staged_count = 0
-        errors = []
-        
-        for i, triple in enumerate(request.triples):
-            try:
-                # Check required fields
-                required_fields = ["head", "relation", "tail"]
-                for field in required_fields:
-                    if field not in triple or not triple[field]:
-                        raise ValueError(f"Missing required field: {field}")
-                
-                # Insert into staging table
-                try:
-                    sqlite_db.execute(
-                        "INSERT INTO staging_triples (h_text, r_text, t_text, status) VALUES (?, ?, ?, 'pending')",
-                        (triple["head"], triple["relation"], triple["tail"])
-                    )
-                    staged_count += 1
-                except Exception as e:
-                    if "UNIQUE constraint failed" in str(e):
-                        logger.info(f"Duplicate triple: {triple}")
-                        # Count as success for duplicate triples
-                        staged_count += 1
-                    else:
-                        raise e
-                
-            except Exception as e:
-                logger.warning(f"Error staging triple {i}: {e}")
-                errors.append({
-                    "index": i,
-                    "triple": triple,
-                    "error": str(e)
-                })
+        # Delegate to ingestion service
+        ingestion_service = get_ingestion_service()
+        result = ingestion_service.stage_triples_batch(
+            triples=request.triples,
+            source="api_batch"
+        )
         
         # Return result
         return {
             "status": "accepted",
-            "triples_staged": staged_count,
-            "errors": errors,
-            "message": f"Staged {staged_count} triples for ingestion"
+            "triples_staged": result.successful_triples,
+            "errors": [{"error": err} for err in result.errors],
+            "message": f"Staged {result.successful_triples} triples for ingestion"
         }
     
     except Exception as e:

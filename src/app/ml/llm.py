@@ -329,12 +329,29 @@ def stream_tokens(prompt: str, **kwargs):
 
 
 def health_check() -> bool:
-    """Check if the LLM backend is working"""
+    """Check if the LLM backend configuration is valid without loading models"""
     try:
-        # Try generating a simple response
+        # Check if the configured backend is available
+        if config.MODEL_BACKEND == "mlx":
+            return MLX_AVAILABLE
+        elif config.MODEL_BACKEND == "huggingface":
+            return HF_AVAILABLE
+        elif config.MODEL_BACKEND == "openai":
+            return OPENAI_AVAILABLE
+        else:
+            # Unknown backend, check if any backend is available
+            return MLX_AVAILABLE or HF_AVAILABLE or OPENAI_AVAILABLE
+    except Exception as e:
+        logger.error(f"LLM health check failed: {e}")
+        return False
+
+def model_readiness_check() -> bool:
+    """Check if models are actually loaded and ready (expensive operation)"""
+    try:
+        # Try generating a simple response - only use this when models need to be tested
         response = generate_answer("Say 'health check passed'.", max_tokens=10)
         # Check if we got some response
         return response is not None and len(response) > 0
     except Exception as e:
-        logger.error(f"LLM health check failed: {e}")
+        logger.error(f"LLM readiness check failed: {e}")
         return False

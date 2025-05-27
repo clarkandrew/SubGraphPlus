@@ -154,12 +154,21 @@ def embed_batch(texts: List[str]) -> np.ndarray:
 
 
 def health_check() -> bool:
-    """Check if the embedding model is working"""
+    """Check if embedding backend configuration is valid without loading models"""
     try:
-        # Try embedding a simple text
+        # Check if HuggingFace (primary) or OpenAI (fallback) is available
+        return HF_AVAILABLE or OPENAI_AVAILABLE
+    except Exception as e:
+        logger.error(f"Embedding health check failed: {e}")
+        return False
+
+def model_readiness_check() -> bool:
+    """Check if embedding models are actually loaded and ready (expensive operation)"""
+    try:
+        # Try embedding a simple text - only use this when models need to be tested
         embedding = embed_text("test")
         # Check if the embedding is a non-zero vector
         return embedding is not None and np.any(embedding)
     except Exception as e:
-        logger.error(f"Embedding health check failed: {e}")
+        logger.error(f"Embedding readiness check failed: {e}")
         return False

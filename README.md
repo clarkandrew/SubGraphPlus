@@ -1014,26 +1014,24 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 ## 📖 Quick Start with Biblical Text
 
 ```bash
-# 1. Start the full stack
-make docker-start
+# 1. Start the unified API (includes IE functionality)
+uvicorn src.app.api:app --host 0.0.0.0 --port 8000
 
-# 2. Start the IE service
-uvicorn src.app.ie_service:app --host 0.0.0.0 --port 8003
+# 2. Ingest Biblical text (IE is integrated)
+python scripts/ingest_with_ie.py data/genesis.txt --api-key your-api-key
 
-# 3. Ingest Biblical text
-python scripts/ingest_with_ie.py data/genesis.txt
-
-# 4. Process staged triples
+# 3. Process staged triples
 python scripts/ingest_worker.py --process-all
 
-# 5. Query the knowledge graph
+# 4. Query the knowledge graph
 curl -X POST http://localhost:8000/query \
   -H "Content-Type: application/json" \
+  -H "X-API-KEY: your-api-key" \
   -d '{"question": "Who parted the Red Sea?"}'
 ```
 
-The system will:
-1. Extract triples using REBEL: `(Moses, parted, Red Sea)`
+The unified system will:
+1. Extract triples using integrated REBEL: `(Moses, parted, Red Sea)`
 2. Type entities using schema: `Moses → Person, Red Sea → Location`
 3. Build knowledge graph with proper relationships
 4. Answer queries with precise citations and subgraph evidence

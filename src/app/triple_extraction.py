@@ -218,44 +218,44 @@ def normalize_relation(relation: str) -> str:
     
     return relation_mappings.get(normalized, normalized)
 
-def batch_process_texts(texts: List[str], ie_service_url: str, max_length: int = 256) -> List[Triple]:
+def batch_process_texts(texts: List[str], api_url: str = "http://localhost:8000", max_length: int = 256, api_key: str = None) -> List[Triple]:
     """
-    Process multiple texts through REBEL IE service
+    Process multiple texts using the services architecture
     
     Args:
         texts: List of text strings to process
-        ie_service_url: URL of the REBEL IE service
+        api_url: URL of the unified SubgraphRAG+ API (kept for compatibility)
         max_length: Maximum sequence length for REBEL
+        api_key: API key for authentication (kept for compatibility)
         
     Returns:
         List of all extracted triples
     """
-    import requests
+    # RULE:debug-trace-every-step
+    logger.debug(f"Starting batch processing of {len(texts)} texts")
+    
+    # Use services architecture instead of direct API calls
+    from ..services.information_extraction import get_information_extraction_service
+    ie_service = get_information_extraction_service()
     
     all_triples = []
     
     for i, text in enumerate(texts):
         try:
-            response = requests.post(
-                f"{ie_service_url}/extract",
-                json={
-                    "text": text,
-                    "max_length": max_length,
-                    "num_beams": 3
-                },
-                timeout=30
-            )
+            logger.debug(f"Processing text {i+1}/{len(texts)}")
             
-            if response.status_code == 200:
-                result = response.json()
-                # Convert API response to our Triple format
-                for triple_data in result['triples']:
+            # Use IE service directly
+            result = ie_service.extract_triples(text, max_length)
+            
+            if result.success:
+                # Convert to our Triple format
+                for triple_data in result.triples:
                     triple = Triple(
                         head=triple_data['head'],
                         relation=normalize_relation(triple_data['relation']),
                         tail=triple_data['tail'],
                         confidence=triple_data.get('confidence', 1.0),
-                        source="rebel_ie_service"
+                        source="ie_service"
                     )
                     # Add entity types
                     from app.entity_typing import get_entity_type
@@ -264,13 +264,16 @@ def batch_process_texts(texts: List[str], ie_service_url: str, max_length: int =
                     
                     all_triples.append(triple)
                 
-                logger.debug(f"Processed text {i+1}/{len(texts)}: {len(result['triples'])} triples")
+                logger.debug(f"Processed text {i+1}/{len(texts)}: {len(result.triples)} triples")
             else:
-                logger.error(f"IE service error for text {i+1}: {response.status_code} - {response.text}")
+                # RULE:rich-error-handling-required
+                logger.error(f"IE service error for text {i+1}: {result.error_message}")
                 
         except Exception as e:
+            # RULE:rich-error-handling-required
             logger.error(f"Error processing text {i+1}: {e}")
     
+    logger.debug(f"Finished batch processing: {len(all_triples)} total triples")
     logger.info(f"Batch processed {len(texts)} texts, extracted {len(all_triples)} total triples")
     return all_triples
 

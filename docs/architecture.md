@@ -10,30 +10,64 @@ SubgraphRAG+ implements a hybrid retrieval architecture that combines graph trav
 
 ## Core Components
 
-### 1. API Layer (`src/app/api.py`)
-- **FastAPI endpoints** with OpenAPI documentation
-- **SSE streaming** for real-time response delivery
-- **Authentication** via API keys
-- **Rate limiting** and request validation
-- **Health/readiness probes** for monitoring
+### API Layer (`src/app/api.py`)
+- **HTTP Endpoints**: Pure FastAPI request/response handling
+- **Authentication**: API key validation and security
+- **Request Validation**: Pydantic models for input validation
+- **Response Serialization**: JSON response formatting
+- **Error Handling**: HTTP status codes and error responses
+- **No Business Logic**: Delegates all processing to services
 
-### 2. Data Models (`src/app/models.py`)
-- **Pydantic models** for request/response validation
-- **Domain objects** (Triple, GraphData, QueryRequest)
-- **Type safety** and automatic serialization
-- **JSON schema** generation for API docs
+### Service Layer (`src/app/services/`)
+- **Information Extraction Service** (`information_extraction.py`): REBEL model management and triple extraction
+- **Ingestion Service** (`ingestion.py`): Text processing, chunking, entity typing, and data pipeline
+- **Business Logic**: Core application functionality separated from HTTP concerns
+- **Singleton Pattern**: Shared service instances for model management
 
-### 3. Configuration Management (`src/app/config.py`)
-- **JSON schema validation** for config files
-- **Environment variable** handling
-- **Backend abstraction** for different LLM providers
-- **Runtime configuration** updates
+### Core Modules
+- **Configuration** (`src/app/config.py`): Centralized configuration management
+- **Database** (`src/app/database.py`): Neo4j and SQLite database interfaces
+- **ML Models** (`src/app/ml/`): LLM and embedding model abstractions
+- **Retrieval** (`src/app/retriever.py`): RAG retrieval logic
+- **Utils** (`src/app/utils.py`): Shared utilities
 
-### 4. Database Layer (`src/app/database.py`)
-- **Neo4j connection** management with connection pooling
-- **SQLite staging** for ingestion queue and auth
-- **Transaction handling** with rollback support
-- **Connection health monitoring**
+### Data Flow
+
+#### Information Extraction Flow
+```
+Raw Text → InformationExtractionService → REBEL Model → Triple Extraction → Parsed Results
+```
+
+#### Ingestion Flow
+```
+Text Input → IngestionService → Text Chunking → IE Service → Entity Typing → SQLite Staging
+```
+
+#### API Request Flow
+```
+HTTP Request → API Layer → Service Layer → Business Logic → Database/Models → Response
+```
+
+## Service Architecture
+
+### Information Extraction Service
+- **Model Management**: Lazy loading of REBEL model
+- **Text Processing**: Tokenization and generation
+- **Triple Parsing**: Custom REBEL output parsing
+- **Error Handling**: Graceful degradation on model failures
+
+### Ingestion Service  
+- **Text Chunking**: Sentence-aware text splitting
+- **Pipeline Coordination**: Orchestrates IE → Entity Typing → Staging
+- **Batch Processing**: Efficient processing of multiple texts
+- **Quality Control**: Validation and error tracking
+
+### Benefits of Service Architecture
+- **Single Responsibility**: Each service has a clear, focused purpose
+- **Testability**: Services can be unit tested independently of HTTP layer
+- **Reusability**: Services can be used by CLI scripts, background workers, etc.
+- **Maintainability**: Clear separation of concerns makes code easier to understand
+- **Scalability**: Services can be optimized or replaced independently
 
 ## Retrieval Architecture
 
