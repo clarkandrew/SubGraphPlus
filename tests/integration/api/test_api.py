@@ -43,11 +43,11 @@ class TestHealthEndpoints:
         assert response.status_code == 200
         assert response.json() == {"status": "ok"}
 
-    @patch('src.app.ml.llm.health_check')
-    @patch('src.app.ml.embedder.health_check')
-    @patch('src.app.retriever.faiss_index')
-    @patch('src.app.database.neo4j_db')
-    @patch('src.app.database.sqlite_db')
+    @patch('src.app.api.llm_health_check')
+    @patch('src.app.api.embedder_health_check')
+    @patch('src.app.api.faiss_index')
+    @patch('src.app.api.neo4j_db')
+    @patch('src.app.api.sqlite_db')
     def test_readiness_check_success(self, mock_sqlite, mock_neo4j, mock_faiss, mock_embedder_health, mock_llm_health):
         """Test readiness check when all services are healthy"""
         # Mock all health checks to return True
@@ -65,11 +65,11 @@ class TestHealthEndpoints:
         # In testing mode, services return "mocked" or "ok"
         assert all(check in ["ok", "mocked"] for check in data["checks"].values())
 
-    @patch('src.app.ml.llm.health_check')
-    @patch('src.app.ml.embedder.health_check')
-    @patch('src.app.retriever.faiss_index')
-    @patch('src.app.database.neo4j_db')
-    @patch('src.app.database.sqlite_db')
+    @patch('src.app.api.llm_health_check')
+    @patch('src.app.api.embedder_health_check')
+    @patch('src.app.api.faiss_index')
+    @patch('src.app.api.neo4j_db')
+    @patch('src.app.api.sqlite_db')
     def test_readiness_check_failure(self, mock_sqlite, mock_neo4j, mock_faiss, mock_embedder_health, mock_llm_health):
         """Test readiness check when some services are unhealthy"""
         # Mock some health checks to return False

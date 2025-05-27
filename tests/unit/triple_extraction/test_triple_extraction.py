@@ -186,7 +186,7 @@ class TestTripleExtraction(unittest.TestCase):
         self.assertEqual(len(triples), 1)
         triple = triples[0]
         self.assertEqual(triple.head, 'Jesus')
-        self.assertEqual(triple.relation, 'place_of_birth')  # normalized
+        self.assertEqual(triple.relation, 'born_in')  # normalized from 'place of birth'
         self.assertEqual(triple.tail, 'Bethlehem')
         self.assertEqual(triple.head_type, 'Person')
         self.assertEqual(triple.tail_type, 'Location')

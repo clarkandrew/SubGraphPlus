@@ -1,0 +1,297 @@
+import os
+import sys
+import pytest
+import sqlite3
+from pathlib import Path
+from unittest.mock import patch, MagicMock
+
+# Set testing environment before any imports
+os.environ['TESTING'] = '1'
+
+# Add parent directory to path so test can import app modules
+sys.path.append(str(Path(__file__).parent.parent))
+
+from src.validation import get_validation_metrics
+from src.app.database import SQLiteDatabase
+
+
+class TestValidationMetrics:
+    """Test validation metrics functionality"""
+
+    def setup_method(self):
+        """Set up test database with sample data"""
+        # Create in-memory database for testing
+        self.db = SQLiteDatabase()
+        
+        # Insert sample staging data
+        self.db.execute(
+            "INSERT INTO staging_triples (h_text, r_text, t_text, status) VALUES (?, ?, ?, ?)",
+            ("test_model_entity", "test_relation", "test_target", "processed")
+        )
+        
+        # Insert sample feedback data
+        feedback_data = [
+            ("test_model_query_1", True, "Good answer"),
+            ("test_model_query_2", True, "Accurate"),
+            ("test_model_query_3", False, "Incorrect"),
+            ("test_model_query_4", True, "Perfect"),
+            ("other_model_query_1", True, "Different model")
+        ]
+        
+        for query_id, is_correct, comment in feedback_data:
+            self.db.execute(
+                "INSERT INTO feedback (query_id, is_correct, comment) VALUES (?, ?, ?)",
+                (query_id, is_correct, comment)
+            )
+
+    def teardown_method(self):
+        """Clean up test database"""
+        if hasattr(self, 'db') and self.db:
+            self.db.close()
+
+    def test_get_validation_metrics_success(self):
+        """Test successful retrieval of validation metrics"""
+        # Test with model that has data
+        result = get_validation_metrics("test_model", self.db)
+        
+        assert result["status"] == "success"
+        assert result["message"] == "Validation metrics retrieved successfully"
+        assert result["metrics"] is not None
+        
+        metrics = result["metrics"]
+        assert "accuracy" in metrics
+        assert "total_validations" in metrics
+        assert "correct_validations" in metrics
+        assert "incorrect_validations" in metrics
+        
+        # Check calculated values
+        assert metrics["total_validations"] == 4  # 4 test_model queries
+        assert metrics["correct_validations"] == 3  # 3 correct answers
+        assert metrics["incorrect_validations"] == 1  # 1 incorrect answer
+        assert metrics["accuracy"] == 0.75  # 3/4 = 0.75
+
+    def test_get_validation_metrics_model_not_found(self):
+        """Test handling when model is not found"""
+        result = get_validation_metrics("nonexistent_model", self.db)
+        
+        assert result["status"] == "error"
+        assert "not found" in result["message"]
+        assert result["metrics"] is None
+
+    def test_get_validation_metrics_no_validation_results(self):
+        """Test handling when model exists but has no validation results"""
+        # Insert a model with no feedback
+        self.db.execute(
+            "INSERT INTO staging_triples (h_text, r_text, t_text, status) VALUES (?, ?, ?, ?)",
+            ("lonely_model_entity", "relation", "target", "processed")
+        )
+        
+        result = get_validation_metrics("lonely_model", self.db)
+        
+        assert result["status"] == "error"
+        assert "No validation results found" in result["message"]
+        assert result["metrics"] is None
+
+    def test_get_validation_metrics_empty_model_id(self):
+        """Test handling of empty model ID"""
+        result = get_validation_metrics("", self.db)
+        
+        assert result["status"] == "error"
+        assert result["metrics"] is None
+
+    def test_get_validation_metrics_no_database(self):
+        """Test handling when no database is provided"""
+        result = get_validation_metrics("test_model", None)
+        
+        assert result["status"] == "error"
+        assert "Database not available" in result["message"]
+        assert result["metrics"] is None
+
+    def test_get_validation_metrics_all_correct(self):
+        """Test metrics calculation when all validations are correct"""
+        # Insert feedback with all correct answers
+        for i in range(3):
+            self.db.execute(
+                "INSERT INTO feedback (query_id, is_correct, comment) VALUES (?, ?, ?)",
+                (f"perfect_model_query_{i}", True, "Perfect answer")
+            )
+        
+        # Insert model data
+        self.db.execute(
+            "INSERT INTO staging_triples (h_text, r_text, t_text, status) VALUES (?, ?, ?, ?)",
+            ("perfect_model_entity", "relation", "target", "processed")
+        )
+        
+        result = get_validation_metrics("perfect_model", self.db)
+        
+        assert result["status"] == "success"
+        metrics = result["metrics"]
+        assert metrics["accuracy"] == 1.0
+        assert metrics["total_validations"] == 3
+        assert metrics["correct_validations"] == 3
+        assert metrics["incorrect_validations"] == 0
+
+    def test_get_validation_metrics_all_incorrect(self):
+        """Test metrics calculation when all validations are incorrect"""
+        # Insert feedback with all incorrect answers
+        for i in range(2):
+            self.db.execute(
+                "INSERT INTO feedback (query_id, is_correct, comment) VALUES (?, ?, ?)",
+                (f"bad_model_query_{i}", False, "Wrong answer")
+            )
+        
+        # Insert model data
+        self.db.execute(
+            "INSERT INTO staging_triples (h_text, r_text, t_text, status) VALUES (?, ?, ?, ?)",
+            ("bad_model_entity", "relation", "target", "processed")
+        )
+        
+        result = get_validation_metrics("bad_model", self.db)
+        
+        assert result["status"] == "success"
+        metrics = result["metrics"]
+        assert metrics["accuracy"] == 0.0
+        assert metrics["total_validations"] == 2
+        assert metrics["correct_validations"] == 0
+        assert metrics["incorrect_validations"] == 2
+
+    def test_get_validation_metrics_database_error(self):
+        """Test handling of database errors"""
+        # Create a mock database that raises an exception
+        mock_db = MagicMock()
+        mock_db.fetchone.side_effect = Exception("Database connection failed")
+        
+        result = get_validation_metrics("test_model", mock_db)
+        
+        assert result["status"] == "error"
+        assert "Error getting validation metrics" in result["message"]
+        assert result["metrics"] is None
+
+    def test_get_validation_metrics_special_characters(self):
+        """Test handling of model IDs with special characters"""
+        # Insert data with special characters
+        special_model_id = "model-with_special.chars@123"
+        
+        self.db.execute(
+            "INSERT INTO staging_triples (h_text, r_text, t_text, status) VALUES (?, ?, ?, ?)",
+            (f"{special_model_id}_entity", "relation", "target", "processed")
+        )
+        
+        self.db.execute(
+            "INSERT INTO feedback (query_id, is_correct, comment) VALUES (?, ?, ?)",
+            (f"{special_model_id}_query", True, "Good")
+        )
+        
+        result = get_validation_metrics(special_model_id, self.db)
+        
+        assert result["status"] == "success"
+        assert result["metrics"]["total_validations"] == 1
+
+    def test_get_validation_metrics_large_dataset(self):
+        """Test performance with larger dataset"""
+        large_model_id = "large_model"
+        
+        # Insert model data
+        self.db.execute(
+            "INSERT INTO staging_triples (h_text, r_text, t_text, status) VALUES (?, ?, ?, ?)",
+            (f"{large_model_id}_entity", "relation", "target", "processed")
+        )
+        
+        # Insert 150 feedback entries (more than the 100 limit)
+        feedback_data = []
+        for i in range(150):
+            feedback_data.append((f"{large_model_id}_query_{i}", i % 2 == 0, f"Comment {i}"))
+        
+        for query_id, is_correct, comment in feedback_data:
+            self.db.execute(
+                "INSERT INTO feedback (query_id, is_correct, comment) VALUES (?, ?, ?)",
+                (query_id, is_correct, comment)
+            )
+        
+        result = get_validation_metrics(large_model_id, self.db)
+        
+        assert result["status"] == "success"
+        # Should only process the most recent 100 entries due to LIMIT clause
+        assert result["metrics"]["total_validations"] == 100
+        # With alternating pattern, should be 50% accuracy
+        assert result["metrics"]["accuracy"] == 0.5
+
+
+class TestValidationIntegration:
+    """Integration tests for validation with real database operations"""
+
+    def setup_method(self):
+        """Set up integration test environment"""
+        self.db = SQLiteDatabase()
+
+    def teardown_method(self):
+        """Clean up integration test environment"""
+        if hasattr(self, 'db') and self.db:
+            self.db.close()
+
+    def test_validation_with_real_database_operations(self):
+        """Test validation metrics with realistic database operations"""
+        model_id = "integration_test_model"
+        
+        # Simulate real application flow
+        # 1. Stage some triples
+        triples = [
+            ("Entity1", "relates_to", "Entity2"),
+            ("Entity2", "part_of", "Entity3"),
+            (f"{model_id}_specific", "type", "Model")
+        ]
+        
+        for head, relation, tail in triples:
+            self.db.execute(
+                "INSERT INTO staging_triples (h_text, r_text, t_text, status) VALUES (?, ?, ?, ?)",
+                (head, relation, tail, "processed")
+            )
+        
+        # 2. Simulate user feedback
+        feedback_entries = [
+            (f"{model_id}_query_1", True, "Excellent response"),
+            (f"{model_id}_query_2", False, "Missed key information"),
+            (f"{model_id}_query_3", True, "Good accuracy"),
+        ]
+        
+        for query_id, is_correct, comment in feedback_entries:
+            self.db.execute(
+                "INSERT INTO feedback (query_id, is_correct, comment) VALUES (?, ?, ?)",
+                (query_id, is_correct, comment)
+            )
+        
+        # 3. Get validation metrics
+        result = get_validation_metrics(model_id, self.db)
+        
+        # 4. Verify results
+        assert result["status"] == "success"
+        metrics = result["metrics"]
+        assert metrics["total_validations"] == 3
+        assert metrics["correct_validations"] == 2
+        assert metrics["incorrect_validations"] == 1
+        assert abs(metrics["accuracy"] - (2/3)) < 0.001  # Account for floating point precision
+
+    def test_validation_metrics_consistency(self):
+        """Test that validation metrics are consistent across multiple calls"""
+        model_id = "consistency_test_model"
+        
+        # Set up test data
+        self.db.execute(
+            "INSERT INTO staging_triples (h_text, r_text, t_text, status) VALUES (?, ?, ?, ?)",
+            (f"{model_id}_entity", "relation", "target", "processed")
+        )
+        
+        for i in range(5):
+            self.db.execute(
+                "INSERT INTO feedback (query_id, is_correct, comment) VALUES (?, ?, ?)",
+                (f"{model_id}_query_{i}", i < 3, f"Comment {i}")
+            )
+        
+        # Call multiple times and verify consistency
+        results = [get_validation_metrics(model_id, self.db) for _ in range(3)]
+        
+        for result in results:
+            assert result["status"] == "success"
+            assert result["metrics"]["total_validations"] == 5
+            assert result["metrics"]["correct_validations"] == 3
+            assert result["metrics"]["accuracy"] == 0.6 
