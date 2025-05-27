@@ -173,12 +173,17 @@ def start_server(port=8000):
     """Start the API server"""
     logger.info(f"🚀 Starting API server on port {port}...")
     
+    # Set up environment for server
+    server_env = os.environ.copy()
+    # Don't set TESTING=1 for demo - we want to show real functionality
+    
     # Start the server in a subprocess
     server_process = subprocess.Popen(
         [sys.executable, "src/main.py", "--port", str(port)],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
-        text=True
+        text=True,
+        env=server_env
     )
     
     # Wait for server to start with progress indicators

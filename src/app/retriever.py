@@ -5,8 +5,16 @@ import numpy as np
 import faiss
 import networkx as nx
 from typing import List, Dict, Tuple, Optional, Any, Set
-import torch
-import torch.nn as nn
+# Conditional imports to speed up testing
+TESTING = os.getenv('TESTING', '').lower() in ('1', 'true', 'yes')
+
+if not TESTING:
+    import torch
+    import torch.nn as nn
+else:
+    # Mock torch for testing
+    torch = None
+    nn = None
 
 from app.config import config
 from app.models import Triple, RetrievalEmpty
@@ -186,19 +194,29 @@ def get_triple_embedding_from_faiss(triple_id: str) -> np.ndarray:
     return embedding
 
 
-class SimpleMLP(nn.Module):
-    """Simple MLP for SubgraphRAG scoring"""
-    def __init__(self, input_dim=4116, hidden_dim=1024, output_dim=1):  # Matches actual pre-trained model
-        super(SimpleMLP, self).__init__()
-        # Architecture must match the saved model: pred.0 (input -> hidden), pred.2 (hidden -> output)
-        self.pred = nn.Sequential(
-            nn.Linear(input_dim, hidden_dim),    # pred.0
-            nn.ReLU(),                           # pred.1 (no parameters)
-            nn.Linear(hidden_dim, output_dim)    # pred.2
-        )
-    
-    def forward(self, x):
-        return self.pred(x)
+if nn is not None:
+    class SimpleMLP(nn.Module):
+        """Simple MLP for SubgraphRAG scoring"""
+        def __init__(self, input_dim=4116, hidden_dim=1024, output_dim=1):  # Matches actual pre-trained model
+            super(SimpleMLP, self).__init__()
+            # Architecture must match the saved model: pred.0 (input -> hidden), pred.2 (hidden -> output)
+            self.pred = nn.Sequential(
+                nn.Linear(input_dim, hidden_dim),    # pred.0
+                nn.ReLU(),                           # pred.1 (no parameters)
+                nn.Linear(hidden_dim, output_dim)    # pred.2
+            )
+        
+        def forward(self, x):
+            return self.pred(x)
+else:
+    class SimpleMLP:
+        """Mock MLP for testing"""
+        def __init__(self, input_dim=4116, hidden_dim=1024, output_dim=1):
+            self.pred = None
+        
+        def forward(self, x):
+            # Return mock output for testing
+            return 0.5
 
 
 def calculate_mlp_input_dim(embeddings, dde_features):
@@ -214,6 +232,10 @@ def calculate_mlp_input_dim(embeddings, dde_features):
 
 def load_pretrained_mlp():
     """Load pre-trained SubgraphRAG MLP model"""
+    if TESTING or torch is None:
+        logger.info("Testing mode: Skipping MLP model loading")
+        return None
+        
     try:
         mlp_path = config.MLP_MODEL_PATH
         if os.path.exists(mlp_path):
@@ -286,7 +308,8 @@ def mlp_score(embeddings_or_query, dde_features_or_triple, index_or_dde_features
             index = int(index_or_dde_features)
             
             # Check if MLP model is available
-            if mlp_model is None:
+            model = get_mlp_model()
+            if model is None:
                 # Fallback to heuristic scoring
                 from app.utils import heuristic_score_indexed
                 return heuristic_score_indexed(dde_features, index)
@@ -335,7 +358,8 @@ def mlp_score(embeddings_or_query, dde_features_or_triple, index_or_dde_features
             dde_values = index_or_dde_features
             
             # Check if MLP model is available
-            if mlp_model is None:
+            model = get_mlp_model()
+            if model is None:
                 # Fallback to heuristic scoring
                 from app.utils import heuristic_score
                 return heuristic_score(query_emb, triple_emb, dde_values)
@@ -366,7 +390,7 @@ def mlp_score(embeddings_or_query, dde_features_or_triple, index_or_dde_features
         input_tensor = torch.cat([query_tensor, triple_tensor, dde_tensor]).unsqueeze(0)
 
         # Check input dimensions
-        expected_dim = mlp_model.fc1.in_features if hasattr(mlp_model, 'fc1') else 773
+        expected_dim = model.fc1.in_features if hasattr(model, 'fc1') else 773
         if input_tensor.shape[1] != expected_dim:
             logger.warning(f"Input dimension mismatch: expected {expected_dim}, got {input_tensor.shape[1]}")
             # Fallback to heuristic scoring based on signature
@@ -379,7 +403,7 @@ def mlp_score(embeddings_or_query, dde_features_or_triple, index_or_dde_features
 
         # Run through MLP model
         with torch.no_grad():
-            output = mlp_model(input_tensor)
+            output = model(input_tensor)
             score = torch.sigmoid(output).item()
 
         return float(score)
@@ -411,7 +435,8 @@ def mlp_score_indexed(embeddings, dde_features, index):
     Returns:
         Float score between 0 and 1
     """
-    if mlp_model is not None:
+    model = get_mlp_model()
+    if model is not None:
         try:
             # Validate inputs
             if embeddings is None or dde_features is None:
@@ -454,7 +479,7 @@ def mlp_score_indexed(embeddings, dde_features, index):
             
             # Get score from MLP
             with torch.no_grad():
-                score = mlp_model(combined.unsqueeze(0)).item()
+                score = model(combined.unsqueeze(0)).item()
             
             return score
         except Exception as e:
@@ -482,7 +507,8 @@ def mlp_score_separate(query_emb: np.ndarray, triple_emb: np.ndarray, dde_featur
     """
     try:
         # Check if MLP model is available
-        if mlp_model is None:
+        model = get_mlp_model()
+        if model is None:
             # Fallback to heuristic scoring
             from app.utils import heuristic_score
             return heuristic_score(query_emb, triple_emb, dde_features)
@@ -507,7 +533,7 @@ def mlp_score_separate(query_emb: np.ndarray, triple_emb: np.ndarray, dde_featur
         input_tensor = torch.tensor(combined_features, dtype=torch.float32).unsqueeze(0)
         
         with torch.no_grad():
-            score = mlp_model(input_tensor)
+            score = model(input_tensor)
             return float(score.item())
 
     except Exception as e:
@@ -569,8 +595,14 @@ def neo4j_get_neighborhood_triples(entity_ids: List[str], hops: int, limit: int)
 
 def faiss_search_triples_data(query_embedding: np.ndarray, k: int = 50) -> List[Dict[str, Any]]:
     """Search FAISS for similar triples and retrieve their data from Neo4j"""
+    # Check if FAISS index is available
+    index = get_faiss_index()
+    if index is None:
+        logger.warning("FAISS index not available, returning empty results")
+        return []
+    
     # Search FAISS
-    triple_ids_scores = faiss_index.search(query_embedding, k)
+    triple_ids_scores = index.search(query_embedding, k)
     
     if not triple_ids_scores:
         return []
@@ -759,9 +791,59 @@ def entity_search(search_term: str, limit: int = 10) -> List[Dict[str, Any]]:
     return entities
 
 
-# Initialize MLP model and FAISS index after all functions are defined
-# Skip loading during testing to prevent segfaults and speed up tests
-if not TESTING:
-    mlp_model = load_pretrained_mlp()
-    faiss_index = FaissIndex()
-    logger.info("Initialized MLP model and FAISS index")
+# Global variables for lazy loading
+mlp_model = None
+faiss_index = None
+_mlp_loading_attempted = False
+_faiss_loading_attempted = False
+
+
+def get_mlp_model():
+    """Lazy load MLP model"""
+    global mlp_model, _mlp_loading_attempted
+    
+    if TESTING:
+        return None
+        
+    if _mlp_loading_attempted:
+        return mlp_model
+        
+    _mlp_loading_attempted = True
+    
+    try:
+        logger.info("Loading MLP model...")
+        mlp_model = load_pretrained_mlp()
+        if mlp_model:
+            logger.info("✅ Successfully loaded MLP model")
+        else:
+            logger.warning("⚠️ MLP model not available, using fallback scoring")
+    except Exception as e:
+        logger.error(f"❌ Failed to load MLP model: {e}")
+        logger.warning("🔄 Continuing with fallback mode (no MLP scoring)")
+        mlp_model = None
+    
+    return mlp_model
+
+
+def get_faiss_index():
+    """Lazy load FAISS index"""
+    global faiss_index, _faiss_loading_attempted
+    
+    if TESTING:
+        return None
+        
+    if _faiss_loading_attempted:
+        return faiss_index
+        
+    _faiss_loading_attempted = True
+    
+    try:
+        logger.info("Loading FAISS index...")
+        faiss_index = FaissIndex()
+        logger.info("✅ Successfully loaded FAISS index")
+    except Exception as e:
+        logger.error(f"❌ Failed to load FAISS index: {e}")
+        logger.warning("🔄 Continuing with fallback mode (no FAISS search)")
+        faiss_index = None
+    
+    return faiss_index

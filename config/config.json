@@ -20,7 +20,7 @@
         "top_p": 0.9
       },
       "huggingface": {
-        "model": "mistralai/Mistral-7B-Instruct-v0.2",
+        "model": "mlx-community/Qwen3-14B-8bit",
         "max_tokens": 512,
         "temperature": 0.1,
         "top_p": 0.9

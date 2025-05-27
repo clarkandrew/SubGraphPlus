@@ -198,17 +198,27 @@ ingest-sample: ## Database - Load sample data
 .PHONY: test
 test: ## Testing - Run test suite
 	@echo "🧪 Running tests..."
-	@$(VENV_PYTHON) -m pytest $(TESTS_DIR)/ -v
+	@TESTING=1 DISABLE_MODELS=1 LOG_LEVEL=DEBUG $(VENV_PYTHON) -m pytest $(TESTS_DIR)/ -v -s --tb=short
+
+.PHONY: test-fast
+test-fast: ## Testing - Run fast tests only
+	@echo "🧪 Running fast tests..."
+	@TESTING=1 DISABLE_MODELS=1 FAST_TEST_MODE=1 LOG_LEVEL=DEBUG $(VENV_PYTHON) -m pytest $(TESTS_DIR)/test_fast.py -v -s --tb=short
+
+.PHONY: test-verbose
+test-verbose: ## Testing - Run tests with maximum verbosity
+	@echo "🧪 Running tests with verbose output..."
+	@TESTING=1 DISABLE_MODELS=1 LOG_LEVEL=DEBUG $(VENV_PYTHON) -m pytest $(TESTS_DIR)/ -vvv -s --tb=long --capture=no
 
 .PHONY: test-coverage
 test-coverage: ## Testing - Run tests with coverage
 	@echo "🧪 Running tests with coverage..."
-	@$(VENV_PYTHON) -m pytest $(TESTS_DIR)/ --cov=$(SRC_DIR) --cov-report=html --cov-report=term
+	@TESTING=1 $(VENV_PYTHON) -m pytest $(TESTS_DIR)/ --cov=$(SRC_DIR) --cov-report=html --cov-report=term
 
 .PHONY: test-integration
 test-integration: ## Testing - Run integration tests
 	@echo "🧪 Running integration tests..."
-	@$(VENV_PYTHON) -m pytest $(TESTS_DIR)/integration/ -v
+	@TESTING=1 $(VENV_PYTHON) -m pytest $(TESTS_DIR)/integration/ -v
 
 .PHONY: lint
 lint: ## Quality - Run code linting

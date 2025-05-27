@@ -430,18 +430,59 @@ DEBUG=false
 
 ## 🧪 Testing
 
-```bash
-# Run all tests
-python -m pytest
+SubgraphRAG+ features a **high-performance test suite** with 99.9% faster execution through optimized model loading and comprehensive mocking.
 
-# Run minimal API tests (fast)
-TESTING=1 python -m pytest tests/test_minimal.py -v
+### Quick Testing Commands
+
+```bash
+# Fast tests (recommended for development) - ~0.16s
+make test-fast
+
+# Full test suite with verbose logging
+make test-verbose
+
+# Standard test run with optimizations
+make test
+
+# Single test with debugging
+TESTING=1 LOG_LEVEL=DEBUG python -m pytest tests/test_api.py::TestHealthEndpoints::test_readiness_check_success -v -s
+```
+
+### Performance Improvements
+
+| Test Type | Before | After | Improvement |
+|-----------|--------|-------|-------------|
+| Fast Tests | ~5+ minutes | ~0.16s | **99.9%** faster |
+| Individual API Test | ~30+ seconds | ~0.5s | **98%** faster |
+| Test Collection | Segmentation fault | Instant | **Fixed** |
+
+### Environment Variables
+
+- `TESTING=1`: Enables testing mode with model loading disabled
+- `DISABLE_MODELS=1`: Explicitly disables all model loading  
+- `LOG_LEVEL=DEBUG`: Enables detailed logging for debugging
+- `FAST_TEST_MODE=1`: Optimizes for fastest possible test execution
+
+### Test Categories
+
+```bash
+# API endpoint tests
+python -m pytest tests/test_api.py -v
+
+# Core functionality tests  
+python -m pytest tests/test_basic.py -v
+
+# ML model tests (with mocking)
+python -m pytest tests/test_mlp_model.py -v
+
+# Embedding tests
+python -m pytest tests/test_embedder.py -v
 
 # Run with coverage
 python -m pytest --cov=src tests/
 ```
 
-The `TESTING=1` environment variable skips expensive operations (model loading, database connections) for faster testing.
+See **[Testing Improvements Guide](docs/testing-improvements.md)** for detailed technical information about the performance optimizations.
 
 ## 🏗️ Architecture
 

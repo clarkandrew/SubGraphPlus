@@ -12,25 +12,34 @@ from rich.console import Console
 console = Console()
 
 # Check for MLX availability (for LLM only, never embeddings)
+# Use lazy loading to prevent slow imports during testing
 MLX_AVAILABLE = False
-try:
-    import mlx.core as mx
-    import mlx.nn as nn
-    MLX_AVAILABLE = True
-    logger.info("MLX is available and will be used as the primary backend for LLM")
-except ImportError:
-    logger.warning("MLX not available. Install with: pip install mlx mlx-lm")
-    logger.warning("Falling back to HuggingFace/OpenAI backends")
+TESTING = os.getenv('TESTING', '').lower() in ('1', 'true', 'yes')
+
+if not TESTING:
+    try:
+        import mlx.core as mx
+        import mlx.nn as nn
+        MLX_AVAILABLE = True
+        logger.info("MLX is available and will be used as the primary backend for LLM")
+    except ImportError:
+        logger.warning("MLX not available. Install with: pip install mlx mlx-lm")
+        logger.warning("Falling back to HuggingFace/OpenAI backends")
+else:
+    logger.info("Testing mode: Skipping MLX imports to speed up tests")
 
 # Check for Hugging Face transformers (fallback for LLM)
 HF_AVAILABLE = False
-try:
-    import torch
-    from transformers import pipeline, AutoTokenizer, AutoModelForCausalLM
-    HF_AVAILABLE = True
-    logger.info("Hugging Face Transformers is available and will be used as fallback")
-except ImportError:
-    logger.warning("Hugging Face Transformers not available, will not be able to use HF models")
+if not TESTING:
+    try:
+        import torch
+        from transformers import pipeline, AutoTokenizer, AutoModelForCausalLM
+        HF_AVAILABLE = True
+        logger.info("Hugging Face Transformers is available and will be used as fallback")
+    except ImportError:
+        logger.warning("Hugging Face Transformers not available, will not be able to use HF models")
+else:
+    logger.info("Testing mode: Skipping HuggingFace imports to speed up tests")
 
 # Check for OpenAI (fallback for LLM)
 OPENAI_AVAILABLE = False
@@ -84,10 +93,14 @@ def get_mlx_model():
         
         # Get model from config
         mlx_config = config.get_model_config("mlx")
-        model_path = mlx_config.get("model", "mlx-community/Qwen3-14B-8bit")
+        model_id = mlx_config.get("model", "mlx-community/Qwen3-14B-8bit")
         
-        logger.info(f"Loading MLX LLM model: {model_path}")
-        model, tokenizer = load(model_path)
+        logger.info(f"Loading MLX LLM model: {model_id}")
+        logger.info("MLX will automatically use cached model from HuggingFace cache directory")
+        
+        # MLX load() function automatically handles caching when given a HF model ID
+        # It will check the HF cache directory first before downloading
+        model, tokenizer = load(model_id)
         return model, tokenizer
     except ImportError:
         logger.warning("MLX LLM not available, using placeholder")
@@ -123,12 +136,18 @@ def mlx_generate(prompt: str, **kwargs) -> str:
             max_tokens = kwargs.get("max_tokens", mlx_config.get("max_tokens", 512))
             temperature = kwargs.get("temperature", mlx_config.get("temperature", 0.1))
             
+            # MLX-LM generate function uses different parameter names
+            # Use sampler for temperature control instead of direct parameter
+            from mlx_lm.sample_utils import make_sampler
+            
+            sampler = make_sampler(temp=temperature)
+            
             response = generate(
                 model, 
                 tokenizer, 
                 prompt=prompt, 
                 max_tokens=max_tokens,
-                temp=temperature,
+                sampler=sampler,
                 verbose=False
             )
             
