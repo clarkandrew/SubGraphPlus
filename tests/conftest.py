@@ -11,6 +11,15 @@ import tempfile
 import numpy as np
 from pathlib import Path
 from unittest.mock import Mock, patch
+import shutil
+
+# Disable model loading during tests to prevent segfaults on Apple Silicon
+os.environ["SUBGRAPHRAG_DISABLE_MODEL_LOADING"] = "true"
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
+# Force HuggingFace to use offline mode - don't check for updates
+os.environ["TRANSFORMERS_OFFLINE"] = "1"
+os.environ["HF_DATASETS_OFFLINE"] = "1"
 
 # Add parent directory to path so tests can import app modules
 sys.path.append(str(Path(__file__).parent.parent))

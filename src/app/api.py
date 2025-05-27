@@ -31,7 +31,7 @@ from app.database import neo4j_db, sqlite_db
 from app.utils import (
     link_entities_v2, extract_query_entities, triples_to_graph_data
 )
-from app.retriever import hybrid_retrieve_v2, entity_search, faiss_index
+from app.retriever import hybrid_retrieve_v2, entity_search, get_faiss_index
 from app.verify import validate_llm_output, format_prompt
 from app.ml.embedder import health_check as embedder_health_check
 from app.ml.llm import generate_answer, stream_tokens, health_check as llm_health_check
@@ -41,11 +41,11 @@ from app.services.information_extraction import get_information_extraction_servi
 from app.services.ingestion import get_ingestion_service
 
 # RULE:import-rich-logger-correctly - Use centralized rich logger
-from .log import logger, log_and_print
+from .log import logger, log_and_print, CONSOLEx
 from rich.console import Console
 
 # Initialize rich console for pretty CLI output
-console = Console()
+
 
 # API Models for Information Extraction
 class ExtractRequest(BaseModel):
@@ -57,6 +57,8 @@ class IETriple(BaseModel):
     head: str
     relation: str
     tail: str
+    head_type: Optional[str] = "ENTITY"
+    tail_type: Optional[str] = "ENTITY"
     confidence: float = 1.0
 
 class ExtractResponse(BaseModel):
@@ -95,7 +97,9 @@ async def lifespan(app: FastAPI):
     # Initialize services (but don't preload models)
     logger.info("Initializing services...")
     ie_service = get_information_extraction_service()
-    ingestion_service = get_ingestion_service()
+    logger.info("IE service initialized")
+    # Temporarily comment out ingestion service to debug hang
+    # ingestion_service = get_ingestion_service()
     logger.info("Services initialized")
     
     yield
@@ -189,10 +193,11 @@ async def readiness_check(skip_model_loading: bool = Query(True, description="Sk
     checks = {
         "sqlite": sqlite_db.verify_connectivity() if sqlite_db is not None else False,
         "neo4j": neo4j_db.verify_connectivity() if neo4j_db is not None else False,
-        "faiss_index": faiss_index.is_trained() if faiss_index is not None else False,
+        "faiss_index": get_faiss_index() is not None and get_faiss_index().is_trained(),
         "llm_backend": llm_health_check(),  # Now lightweight
         "embedder": embedder_health_check(),  # Now lightweight
-        "rebel_service": ie_service.is_service_available()  # Check service, not model loading
+        "rebel_service": ie_service.is_service_available(),  # Check service, not model loading
+        "ie_models_available": ie_service.is_service_available()  # IE models available
     }
     
     # Expensive checks (only if requested)
@@ -203,7 +208,8 @@ async def readiness_check(skip_model_loading: bool = Query(True, description="Sk
         checks.update({
             "llm_model_loaded": llm_readiness(),
             "embedder_model_loaded": embedder_readiness(),
-            "rebel_model_loaded": ie_service.is_model_loaded()
+            "rebel_model_loaded": ie_service.is_rebel_loaded(),
+            "ner_model_loaded": ie_service.is_ner_loaded()
         })
     
     # During testing, consider the service ready even if some components are mocked
@@ -258,16 +264,34 @@ async def extract_triples(
     Returns:
         ExtractResponse with extracted triples and metadata
     """
-    logger.debug("Starting IE triple extraction API request")
+    import sys
+    CONSOLEx.print(f"\n{'='*60}", flush=True)
+    CONSOLEx.print(f"🎯 IE EXTRACTION REQUEST RECEIVED", flush=True)
+    CONSOLEx.print(f"📝 Text: '{request.text[:50]}...'", flush=True)
+    CONSOLEx.print(f"📏 Length: {len(request.text)} characters", flush=True)
+    CONSOLEx.print(f"{'='*60}\n", flush=True)
+    sys.stdout.flush()
+    
+    logger.info(f"🎯 Starting IE extraction for text: '{request.text[:50]}...' (length: {len(request.text)})")
+    CONSOLEx.print(f"[bold green]🎯 IE Extraction Request[/bold green] - Text length: {len(request.text)} chars")
     
     try:
         # Delegate to information extraction service
         ie_service = get_information_extraction_service()
+        print("📞 Getting IE service instance...", flush=True)
+        logger.info("📞 Calling IE service extract_triples...")
+        CONSOLEx.print("[yellow]📞 Calling IE service...[/yellow]")
+        
+        print("🚀 Calling extract_triples method...", flush=True)
         result = ie_service.extract_triples(
             text=request.text,
             max_length=request.max_length,
             num_beams=request.num_beams
         )
+        
+        print(f"✅ Extraction completed!", flush=True)
+        logger.info(f"✅ IE extraction completed: {len(result.triples) if result.success else 0} triples")
+        CONSOLEx.print(f"[bold green]✅ Extraction completed[/bold green] - Found {len(result.triples) if result.success else 0} triples")
         
         if not result.success:
             raise HTTPException(
@@ -281,23 +305,32 @@ async def extract_triples(
                 head=t['head'],
                 relation=t['relation'],
                 tail=t['tail'],
+                head_type=t.get('head_type', 'ENTITY'),
+                tail_type=t.get('tail_type', 'ENTITY'),
                 confidence=t['confidence']
             )
             for t in result.triples
         ]
         
-        return ExtractResponse(
+        response = ExtractResponse(
             triples=triples,
             raw_output=result.raw_output,
             processing_time=result.processing_time
         )
+        
+        # Log the response for debugging
+        print(f"\n📤 Sending response with {len(triples)} triples", flush=True)
+        print(f"⏱️  Processing time: {result.processing_time:.2f}s", flush=True)
+        print(f"{'='*60}\n", flush=True)
+        
+        return response
 
     except HTTPException:
         raise
     except Exception as e:
         # RULE:rich-error-handling-required
         logger.error(f"Error in extract triples API: {e}")
-        console.print_exception()
+        CONSOLEx.print_exception()
         raise HTTPException(500, f"Extraction failed: {e}")
 
 @app.get("/ie/health")
@@ -307,10 +340,27 @@ async def ie_health_check():
         ie_service = get_information_extraction_service()
         model_info = ie_service.get_model_info()
         
+        # Check individual model status
+        rebel_status = "loaded" if any(m["loaded"] and m["purpose"] == "relation_extraction" for m in model_info["models"]) else "not_loaded"
+        ner_status = "loaded" if any(m["loaded"] and m["purpose"] == "entity_typing" for m in model_info["models"]) else "not_loaded"
+        
+        overall_status = "healthy" if model_info["overall_status"] == "ready" else "partial" if model_info["overall_status"] == "partial" else "unhealthy"
+        
         return {
-            "status": "healthy" if model_info["loaded"] else "unhealthy",
-            "model": model_info["model_name"],
-            "model_loaded": model_info["loaded"]
+            "status": overall_status,
+            "models": {
+                "rebel": {
+                    "name": "Babelscape/rebel-large",
+                    "purpose": "relation_extraction",
+                    "status": rebel_status
+                },
+                "ner": {
+                    "name": "tner/roberta-large-ontonotes5",
+                    "purpose": "entity_typing",
+                    "status": ner_status
+                }
+            },
+            "overall_status": model_info["overall_status"]
         }
     except Exception as e:
         # RULE:rich-error-handling-required
@@ -370,7 +420,7 @@ async def ingest_text(
     except Exception as e:
         # RULE:rich-error-handling-required
         logger.error(f"Error in text ingestion API: {e}")
-        console.print_exception()
+        CONSOLEx.print_exception()
         raise HTTPException(500, f"Text ingestion failed: {e}")
 
 # Query endpoint

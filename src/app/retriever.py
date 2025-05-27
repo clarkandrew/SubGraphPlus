@@ -2,7 +2,18 @@ import os
 import json
 import time
 import numpy as np
-import faiss
+
+# Suppress FAISS GPU warnings before importing faiss
+import warnings
+import logging
+faiss_logger = logging.getLogger('faiss')
+faiss_logger.setLevel(logging.ERROR)
+
+# Temporarily suppress specific warnings during FAISS import
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    import faiss
+
 import networkx as nx
 from typing import List, Dict, Tuple, Optional, Any, Set
 # Conditional imports to speed up testing
@@ -64,7 +75,7 @@ class FaissIndex:
                 logger.info(f"Loaded FAISS index with {self.index.ntotal} vectors")
                 
                 # Load ID mapping
-                id_map_path = f"{index_path}.ids"
+                id_map_path = f"{index_path}.ids.npy"
                 if os.path.exists(id_map_path):
                     self.id_map = np.load(id_map_path, allow_pickle=True).item()
                     logger.info(f"Loaded ID map with {len(self.id_map)} entries")
@@ -127,7 +138,7 @@ class FaissIndex:
             logger.info(f"Added {len(ids)} vectors to FAISS index")
             
             # Save ID mapping
-            np.save(f"{config.FAISS_INDEX_PATH}.ids", self.id_map)
+            np.save(f"{config.FAISS_INDEX_PATH}.ids.npy", self.id_map)
         except Exception as e:
             logger.error(f"Failed to add vectors to FAISS index: {e}")
     

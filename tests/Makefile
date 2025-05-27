@@ -1,111 +1,116 @@
-# SubgraphRAG+ Test Suite Makefile
-# Provides convenient commands for running organized tests
+# SubgraphRAG+ Test Makefile
+# 
+# This Makefile provides convenient targets for running tests according to
+# the testing standards with proper categorization and timeout handling.
 
-.PHONY: help test test-all test-unit test-integration test-e2e test-performance test-adversarial test-smoke
-.PHONY: test-fast test-feature test-llm test-entity test-triple test-api test-embedder test-retriever
-.PHONY: coverage clean
+.PHONY: help test test-smoke test-unit test-integration test-e2e test-performance test-adversarial test-coverage test-debug clean
 
 # Default target
 help:
-	@echo "SubgraphRAG+ Test Suite Commands"
-	@echo "================================"
+	@echo "SubgraphRAG+ Test Suite"
+	@echo "======================="
 	@echo ""
-	@echo "Test Categories:"
-	@echo "  test-all         Run all tests (smoke -> unit -> integration -> adversarial -> e2e -> performance)"
-	@echo "  test-unit        Run unit tests only (fast, isolated)"
-	@echo "  test-integration Run integration tests (component interactions)"
-	@echo "  test-e2e         Run end-to-end tests (requires real backends)"
-	@echo "  test-performance Run performance/load tests (slow)"
-	@echo "  test-adversarial Run adversarial/edge-case tests"
-	@echo "  test-smoke       Run smoke tests (ultra-fast sanity checks)"
+	@echo "Available targets:"
+	@echo "  test              - Run smoke tests (default, quick sanity check)"
+	@echo "  test-smoke        - Run smoke tests (<30s total)"
+	@echo "  test-unit         - Run unit tests (<2 minutes)"
+	@echo "  test-integration  - Run integration tests (<5 minutes)"
+	@echo "  test-e2e          - Run end-to-end tests (<10 minutes)"
+	@echo "  test-performance  - Run performance tests"
+	@echo "  test-adversarial  - Run adversarial/robustness tests"
+	@echo "  test-all          - Run all test suites"
+	@echo "  test-coverage     - Run unit tests with coverage report"
+	@echo "  test-debug        - Run smoke tests with debug output"
+	@echo "  clean             - Clean test artifacts"
 	@echo ""
-	@echo "Quick Options:"
-	@echo "  test-fast        Run only fast tests (smoke + unit + integration)"
-	@echo "  test             Alias for test-fast"
-	@echo ""
-	@echo "Feature-Specific:"
-	@echo "  test-llm         Run all LLM tests (unit + integration + e2e)"
-	@echo "  test-entity      Run entity typing tests"
-	@echo "  test-triple      Run triple extraction tests"
-	@echo "  test-api         Run API tests"
-	@echo "  test-embedder    Run embedder tests"
-	@echo "  test-retriever   Run retriever tests"
-	@echo ""
-	@echo "Utilities:"
-	@echo "  coverage         Generate test coverage report"
-	@echo "  clean            Clean test artifacts and cache"
+	@echo "Examples:"
+	@echo "  make test                    # Quick smoke tests"
+	@echo "  make test-unit               # Unit tests only"
+	@echo "  make test-coverage           # Unit tests with coverage"
+	@echo "  make test-all                # All test suites"
 
-# Main test targets
-test: test-fast
+# Default test target (smoke tests for quick feedback)
+test: test-smoke
 
-test-all:
-	python run_tests.py all
+# Individual test suite targets
+test-smoke:
+	@echo "🧪 Running smoke tests..."
+	python run_tests.py --suite smoke
 
 test-unit:
-	python run_tests.py unit
+	@echo "🧪 Running unit tests..."
+	python run_tests.py --suite unit
 
 test-integration:
-	python run_tests.py integration
+	@echo "🧪 Running integration tests..."
+	python run_tests.py --suite integration
 
 test-e2e:
-	python run_tests.py e2e
+	@echo "🧪 Running end-to-end tests..."
+	python run_tests.py --suite e2e
 
 test-performance:
-	python run_tests.py performance
+	@echo "🧪 Running performance tests..."
+	python run_tests.py --suite performance
 
 test-adversarial:
-	python run_tests.py adversarial
+	@echo "🧪 Running adversarial tests..."
+	python run_tests.py --suite adversarial
 
-test-smoke:
-	python run_tests.py smoke
+test-all:
+	@echo "🧪 Running all test suites..."
+	python run_tests.py --suite all
 
-test-fast:
-	python run_tests.py all --fast
+# Special targets
+test-coverage:
+	@echo "🧪 Running unit tests with coverage..."
+	python run_tests.py --suite unit --coverage
 
-# Feature-specific tests
-test-llm:
-	python run_tests.py --feature llm
+test-debug:
+	@echo "🧪 Running smoke tests with debug output..."
+	python run_tests.py --suite smoke --debug --verbose
 
-test-entity:
-	python run_tests.py --feature entity_typing
-
-test-triple:
-	python run_tests.py --feature triple_extraction
-
-test-api:
-	python run_tests.py --feature api
-
-test-embedder:
-	python run_tests.py --feature embedder
-
-test-retriever:
-	python run_tests.py --feature retriever
-
-# Coverage and utilities
-coverage:
-	pytest unit/ --cov=src --cov-report=html --cov-report=term-missing
-	@echo "Coverage report generated in htmlcov/"
-
+# Utility targets
 clean:
-	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
-	find . -type f -name "*.pyc" -delete 2>/dev/null || true
-	find . -type d -name ".pytest_cache" -exec rm -rf {} + 2>/dev/null || true
-	rm -rf htmlcov/ .coverage 2>/dev/null || true
-	rm -rf logs/*.log 2>/dev/null || true
-	@echo "Test artifacts cleaned"
+	@echo "🧹 Cleaning test artifacts..."
+	rm -rf tests/coverage_html/
+	rm -rf tests/.coverage
+	rm -rf tests/.pytest_cache/
+	rm -rf tests/__pycache__/
+	find tests/ -name "*.pyc" -delete
+	find tests/ -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
+	@echo "✅ Test artifacts cleaned"
 
-# CI/CD targets
-ci-fast:
-	python run_tests.py smoke
-	python run_tests.py unit
-	python run_tests.py integration --markers "not slow"
+# Continuous Integration targets
+ci-smoke:
+	@echo "🚀 CI: Running smoke tests..."
+	timeout 60s python run_tests.py --suite smoke --verbose
 
-ci-full:
-	python run_tests.py all
+ci-unit:
+	@echo "🚀 CI: Running unit tests with coverage..."
+	timeout 180s python run_tests.py --suite unit --coverage --verbose
+
+ci-integration:
+	@echo "🚀 CI: Running integration tests..."
+	timeout 360s python run_tests.py --suite integration --verbose
+
+ci-all:
+	@echo "🚀 CI: Running all tests..."
+	timeout 1800s python run_tests.py --suite all --coverage --verbose
 
 # Development targets
-dev-watch:
-	pytest-watch unit/ integration/ --clear
+dev-fast:
+	@echo "⚡ Running fast development tests..."
+	python run_tests.py --suite smoke --verbose
 
-dev-debug:
-	pytest unit/ integration/ -v -s --tb=long 
+dev-ie:
+	@echo "🔍 Running IE-specific tests..."
+	python -m pytest smoke/test_ie_consolidated.py unit/services/test_information_extraction.py -v
+
+dev-watch:
+	@echo "👀 Running tests in watch mode..."
+	python -m pytest smoke/ --verbose --tb=short -f
+
+# Help target for listing available test suites
+list-suites:
+	python run_tests.py --list-suites 

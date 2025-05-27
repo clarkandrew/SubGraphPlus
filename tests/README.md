@@ -1,308 +1,192 @@
 # SubgraphRAG+ Test Suite
 
-This directory contains the comprehensive test suite for the SubgraphRAG+ project, organized by test type and scope following testing best practices.
+This directory contains comprehensive tests for the SubgraphRAG+ Information Extraction (IE) pipeline, organized according to testing best practices.
 
-## Test Structure
+## Test Organization
 
 ```
 tests/
-├── README.md
-├── conftest.py                 # shared fixtures & config
-│
-├── unit/                       # pure unit tests, no I/O or ML models
-│   ├── entity_typing/
-│   │   └── test_entity_typing.py
-│   ├── triple_extraction/
-│   │   └── test_triple_extraction.py
-│   ├── mlp/
-│   │   └── test_mlp.py
-│   ├── llm/
-│   │   └── test_llm.py
-│   └── utils/
-│       └── test_utils.py
-│
-├── integration/                # tests that spin up components & talk over interfaces
-│   ├── api/
-│   │   └── test_api.py
-│   ├── embedder/
-│   │   └── test_embedder.py
-│   ├── retriever/
-│   │   └── test_retriever.py
-│   ├── llm/
-│   │   └── test_llm_integration.py
-│   └── general/
-│       └── test_integration.py
-│
-├── e2e/                        # full-system smoke & domain workflows
-│   └── llm_functionality/
-│       └── test_llm_real_functionality.py
-│
-├── performance/                # load & latency benchmarks
-│   └── test_llm_performance.py
-│
-├── adversarial/                # edge-case and adversarial robustness tests
-│   └── test_adversarial.py
-│
-├── smoke/                      # very quick sanity checks
-│   ├── test_smoke.py
-│   ├── test_basic.py
-│   ├── test_minimal.py
-│   ├── test_ultra_minimal.py
-│   └── test_fast.py
-│
-└── fixtures/                   # static data & mocks
-    ├── expected_responses.json
-    └── sample_prompts.json
+├── unit/           # Pure logic tests, minimal mocking
+├── integration/    # Real component interactions
+├── e2e/            # End-to-end system flows
+├── performance/    # Load and latency tests
+├── adversarial/    # Robustness and edge cases
+├── smoke/          # Quick sanity checks
+├── fixtures/       # Test data and configurations
+├── conftest.py     # Shared fixtures
+└── README.md       # This file
 ```
 
 ## Test Categories
 
 ### Unit Tests (`tests/unit/`)
 - **Purpose**: Test individual functions and classes in isolation
-- **Organization**: Grouped by feature/module (entity_typing, triple_extraction, mlp, llm, utils)
-- **Characteristics**: 
-  - Use extensive mocking to isolate components
-  - Fast execution (< 1 second per test)
-  - High coverage of edge cases and error conditions
-  - No external dependencies or I/O operations
+- **Scope**: Pure logic, minimal external dependencies
+- **Mocking**: Only for true externalities (network, file system, time)
+- **Speed**: Fast (<1s per test)
 
 ### Integration Tests (`tests/integration/`)
-- **Purpose**: Test component interactions and workflows
-- **Organization**: Grouped by feature/module (api, embedder, retriever, llm, general)
-- **Characteristics**:
-  - Limited mocking, focus on real component integration
-  - Moderate execution time (1-10 seconds per test)
-  - Test configuration loading, backend fallbacks, etc.
-  - Spin up components and test interfaces
+- **Purpose**: Test real interactions between components
+- **Scope**: API endpoints, database operations, service integrations
+- **Mocking**: Minimal - prefer real implementations
+- **Speed**: Medium (1-10s per test)
 
 ### End-to-End Tests (`tests/e2e/`)
-- **Purpose**: Test complete workflows with real backends
-- **Organization**: Grouped by domain workflows (llm_functionality)
-- **Characteristics**:
-  - Minimal mocking, real functionality testing
-  - Longer execution time (10+ seconds per test)
-  - Require actual LLM backends to be available
-  - Full-system smoke tests
+- **Purpose**: Test complete user workflows
+- **Scope**: Full system behavior from input to output
+- **Mocking**: None - test the real system
+- **Speed**: Slower (10-60s per test)
 
 ### Performance Tests (`tests/performance/`)
-- **Purpose**: Test load handling, latency, and resource usage
-- **Characteristics**:
-  - Measure response times, memory usage, concurrent handling
-  - Long execution time (30+ seconds per test)
-  - Generate performance metrics and reports
-  - Load & latency benchmarks
+- **Purpose**: Validate latency, throughput, and resource usage
+- **Scope**: Load testing, memory profiling, concurrent operations
+- **Metrics**: Response times, memory usage, CPU utilization
 
 ### Adversarial Tests (`tests/adversarial/`)
-- **Purpose**: Test edge cases and adversarial robustness
-- **Characteristics**:
-  - Test system behavior under stress
-  - Edge case validation
-  - Security and robustness testing
-  - Malformed input handling
+- **Purpose**: Test system robustness and edge cases
+- **Scope**: Malformed inputs, boundary conditions, error scenarios
+- **Focus**: Security, stability, graceful degradation
 
 ### Smoke Tests (`tests/smoke/`)
-- **Purpose**: Very quick sanity checks
-- **Characteristics**:
-  - Ultra-fast execution (< 0.5 seconds per test)
-  - Basic functionality verification
-  - CI/CD pipeline health checks
-  - Minimal resource usage
+- **Purpose**: Quick validation that core functionality works
+- **Scope**: Basic operations, health checks, configuration validation
+- **Speed**: Very fast (<30s total)
 
 ## Running Tests
 
-### Run All Tests
+### Quick Start
 ```bash
-pytest tests/
+# Run all tests
+make test
+
+# Run specific test categories
+make test-unit
+make test-integration
+make test-e2e
+make test-smoke
+
+# Run with coverage
+make test-coverage
 ```
 
-### Run by Category
+### Detailed Test Runner
 ```bash
-# Unit tests only (fast)
-pytest tests/unit/
+# Use the comprehensive test runner
+python tests/run_tests.py --help
 
-# Integration tests
-pytest tests/integration/
-
-# End-to-end tests (requires real backends)
-pytest tests/e2e/
-
-# Performance tests (slow)
-pytest tests/performance/
-
-# Adversarial tests
-pytest tests/adversarial/
-
-# Smoke tests (ultra-fast)
-pytest tests/smoke/
+# Run specific test suites
+python tests/run_tests.py --suite smoke
+python tests/run_tests.py --suite unit
+python tests/run_tests.py --suite integration
 ```
 
-### Run by Feature/Module
-```bash
-# Entity typing tests
-pytest tests/unit/entity_typing/
+## Test Data Management
 
-# Triple extraction tests
-pytest tests/unit/triple_extraction/
+### Fixtures (`tests/fixtures/`)
+- Static test data for reproducible tests
+- Versioned configurations and sample inputs
+- Expected outputs for validation
 
-# LLM tests (unit + integration)
-pytest tests/unit/llm/ tests/integration/llm/
+### Dynamic Test Data
+- Generated using factories and builders
+- Property-based testing for edge cases
+- Sanitized real-world examples
 
-# API tests
-pytest tests/integration/api/
+## Information Extraction (IE) Tests
 
-# Embedder tests
-pytest tests/integration/embedder/
-```
+### Core IE Functionality
+- **Model Loading**: Verify REBEL and NER models load correctly
+- **Triple Extraction**: Test extraction accuracy and format
+- **Entity Typing**: Validate entity classification
+- **Service Integration**: Test IE service wrapper and API
 
-### Run by Markers
-```bash
-# Run only fast tests
-pytest -m "not slow"
+### Test Strategy
+- **Real Models**: Use cached models for integration/e2e tests
+- **Mocked Models**: Use mocks for unit tests to avoid model loading overhead
+- **Performance**: Measure extraction speed and memory usage
+- **Robustness**: Test with various text inputs and edge cases
 
-# Run tests that require MLX
-pytest -m "requires_mlx"
+## Best Practices
 
-# Run performance tests
-pytest -m "performance"
+### Test Writing
+1. **One Behavior Per Test**: Each test validates one specific behavior
+2. **Arrange-Act-Assert**: Clear test structure
+3. **Meaningful Names**: `test_<function>_<scenario>_<expected>()`
+4. **Clear Assertions**: Descriptive error messages
 
-# Run smoke tests
-pytest -m "smoke"
-```
+### Mocking Guidelines
+1. **Mock Only Externalities**: Network, file system, time, randomness
+2. **Never Mock Your Own Code**: Test real implementations
+3. **Document Mocks**: Explain why real code cannot be used
+4. **Prefer Real Over Mock**: Default to testing actual implementations
 
-### Run Specific Test Files
-```bash
-# LLM unit tests
-pytest tests/unit/llm/test_llm.py
-
-# LLM integration tests
-pytest tests/integration/llm/test_llm_integration.py
-
-# Real LLM functionality (requires backends)
-pytest tests/e2e/llm_functionality/test_llm_real_functionality.py
-
-# Performance tests
-pytest tests/performance/test_llm_performance.py
-
-# Adversarial tests
-pytest tests/adversarial/test_adversarial.py
-```
-
-## Test Configuration
-
-### Environment Variables
-- `TESTING=1`: Enable testing mode (mocked responses)
-- `TESTING=0`: Disable testing mode (real LLM backends)
-
-### Backend Requirements
-- **MLX Tests**: Require MLX installation and model cache
-- **OpenAI Tests**: Require `OPENAI_API_KEY` environment variable
-- **HuggingFace Tests**: Require transformers and torch installation
-
-### Test Fixtures
-- `sample_prompts`: Pre-defined test prompts of various types
-- `expected_responses`: Expected response patterns and quality checks
-- `mock_llm_response`: Standard mock response for testing mode
-- `performance_test_config`: Configuration for performance tests
-
-## LLM Test Coverage
-
-### Unit Tests (`test_llm.py`)
-- ✅ Configuration validation
-- ✅ Backend selection logic
-- ✅ Generation with different parameters
-- ✅ Error handling and fallbacks
-- ✅ Streaming functionality
-- ✅ Health check mechanisms
-- ✅ Mock model interactions
-
-### Integration Tests (`test_llm_integration.py`)
-- ✅ End-to-end generation workflow
-- ✅ Parameter validation across system
-- ✅ Concurrent request handling
-- ✅ Backend fallback integration
-- ✅ Configuration loading
-- ✅ Memory and performance monitoring
-
-### E2E Tests (`test_llm_real_functionality.py`)
-- ✅ Real backend availability detection
-- ✅ Actual response generation and validation
-- ✅ Parameter variation testing
-- ✅ Streaming with real backends
-- ✅ Context understanding capabilities
-- ✅ Response consistency testing
-
-### Performance Tests (`test_llm_performance.py`)
-- ✅ Single request latency measurement
-- ✅ Streaming performance metrics
-- ✅ Concurrent load testing
-- ✅ Sustained load over time
-- ✅ Memory usage monitoring
-- ✅ CPU usage pattern analysis
-
-## MLP Test Coverage
-
-### Unit Tests (`test_mlp.py`)
-- ✅ Model loading and configuration
-- ✅ Scoring with mock models
-- ✅ Fallback to heuristic scoring
-- ✅ Input validation and error handling
-- ✅ Architecture compatibility testing
-- ✅ Performance characteristics
-
-## Test Quality Metrics
-
-### Current Status
-- **Total Tests**: 50+ tests across all categories
-- **Unit Test Coverage**: 95%+ of LLM and MLP modules
-- **Integration Coverage**: All major component interactions
-- **Performance Benchmarks**: Latency, throughput, resource usage
-- **E2E Validation**: Real functionality when backends available
-
-### Performance Benchmarks
-- **Unit Test Speed**: < 1s per test
-- **Integration Test Speed**: 1-10s per test
-- **LLM Response Time**: < 30s (real backends)
-- **Memory Usage**: < 100MB increase during testing
-- **Concurrent Handling**: 10+ simultaneous requests
+### Performance Considerations
+1. **Fast Unit Tests**: Keep under 1 second each
+2. **Parallel Execution**: Tests must be independent
+3. **Resource Cleanup**: Proper teardown of test resources
+4. **Timeout Protection**: Prevent hanging tests
 
 ## Continuous Integration
 
-### Test Execution Strategy
-1. **PR Validation**: Unit + Integration tests (fast feedback)
-2. **Nightly Builds**: Full test suite including E2E and performance
-3. **Release Validation**: Complete test suite with real backends
+### Test Execution
+- All test categories run on every PR
+- Coverage enforcement (>90% for critical modules)
+- Performance regression detection
+- Flake rate monitoring (<1%)
 
-### Test Environment Matrix
-- **Testing Mode**: Fast execution with mocks
-- **MLX Backend**: Real MLX model testing (when available)
-- **OpenAI Backend**: API integration testing (with key)
-- **HuggingFace Backend**: Transformer model testing
+### Quality Gates
+- All tests must pass before merge
+- Coverage cannot decrease
+- Performance budgets enforced
+- No skipped tests without justification
+
+## Troubleshooting
+
+### Common Issues
+1. **Model Loading Failures**: Check `SUBGRAPHRAG_DISABLE_MODEL_LOADING` environment variable
+2. **Segmentation Faults**: Use mocked tests on Apple Silicon for model-heavy operations
+3. **Hanging Tests**: Check for threading conflicts with FastAPI TestClient
+4. **Import Errors**: Verify PYTHONPATH includes project root
+
+### Debug Mode
+```bash
+# Run with verbose output
+python tests/run_tests.py --verbose --debug
+
+# Run single test with debugging
+pytest -xvs tests/unit/services/test_information_extraction.py::test_extract_triples_success
+```
 
 ## Contributing
 
 ### Adding New Tests
-1. Choose appropriate test category (unit/integration/e2e/performance)
-2. Use existing fixtures and patterns
-3. Follow naming conventions: `test_<functionality>.py`
-4. Add appropriate pytest markers
-5. Update this README if adding new test categories
+1. Choose appropriate test category based on scope
+2. Follow naming conventions and structure
+3. Add fixtures to `tests/fixtures/` if needed
+4. Update this README if adding new test patterns
 
-### Test Best Practices
-- Use descriptive test names that explain what is being tested
-- Include both positive and negative test cases
-- Mock external dependencies in unit tests
-- Use real components in integration tests when possible
-- Add performance assertions for critical paths
-- Clean up resources in test teardown
+### Test Review Checklist
+- [ ] Tests follow Arrange-Act-Assert pattern
+- [ ] Minimal and justified mocking
+- [ ] Clear, descriptive test names
+- [ ] Proper error handling and edge cases
+- [ ] Performance considerations addressed
+- [ ] Documentation updated if needed
 
-### Debugging Tests
-```bash
-# Run with verbose output
-pytest -v tests/unit/test_llm.py
+## Metrics and Monitoring
 
-# Run with debug logging
-pytest -s --log-cli-level=DEBUG tests/
+### Coverage Targets
+- Unit Tests: >95% line coverage
+- Integration Tests: >90% feature coverage
+- E2E Tests: >80% user workflow coverage
 
-# Run specific test method
-pytest tests/unit/test_llm.py::TestLLMGeneration::test_generate_answer_basic
-```
+### Performance Budgets
+- Unit Test Suite: <2 minutes
+- Integration Test Suite: <5 minutes
+- E2E Test Suite: <10 minutes
+- Smoke Test Suite: <30 seconds
+
+### Quality Metrics
+- Flake Rate: <1%
+- Test Maintenance Ratio: <10% of development time
+- Bug Escape Rate: <5% of releases

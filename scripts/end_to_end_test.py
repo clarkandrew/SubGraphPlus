@@ -104,7 +104,8 @@ PDF_INPUT_FILE = "data/test_documents/sample_document.pdf"
 API_BASE_URL = "http://localhost:8000"
 # Note: IE functionality is now integrated into the main API at /ie/ endpoints
 TEST_QUESTION = "What is the main topic discussed in the document?"
-TIMEOUT_SECONDS = 120  # Increased for model loading operations
+TIMEOUT_SECONDS = 300  # Increased to 5 minutes for model loading operations
+MODEL_LOADING_TIMEOUT = 600  # 10 minutes for initial model loading
 MIN_REQUIRED_DISK_SPACE_GB = 2
 REQUIRED_PYTHON_VERSION = (3, 8)
 
@@ -429,7 +430,7 @@ def ingest_document(file_path: str) -> Dict[str, Any]:
                 "chunk_size": 1000
             },
             headers={"X-API-KEY": API_KEY_SECRET},
-            timeout=TIMEOUT_SECONDS
+            timeout=MODEL_LOADING_TIMEOUT  # Use longer timeout for model loading
         )
         
         processing_time = time.time() - start_time
@@ -575,24 +576,24 @@ def validate_neo4j_changes(baseline: Dict[str, Any]) -> Dict[str, Any]:
             # Get sample of recent entities (last 10)
             console.print(f"\n[blue]🎯 Sample Entities in Graph:[/blue]")
             sample_entities = session.run(
-                "MATCH (n:Entity) RETURN n.name, n.type ORDER BY n.name LIMIT 10"
+                "MATCH (n:Entity) RETURN coalesce(n.name, n.id, 'Unknown') as name, coalesce(n.type, 'Unknown') as type ORDER BY name LIMIT 10"
             ).data()
             
             for entity in sample_entities:
-                name = entity['name'] or 'Unknown'
-                etype = entity['type'] or 'Unknown'
+                name = entity.get('name', 'Unknown')
+                etype = entity.get('type', 'Unknown')
                 console.print(f"  • {name} ({etype})")
             
             # Get sample relationships to show graph structure
             console.print(f"\n[blue]⚡ Sample Knowledge Graph Triples:[/blue]")
             sample_relationships = session.run(
-                "MATCH (h:Entity)-[r:REL]->(t:Entity) RETURN h.name as head, r.name as relation, t.name as tail LIMIT 10"
+                "MATCH (h:Entity)-[r:REL]->(t:Entity) RETURN coalesce(h.name, h.id, 'Unknown') as head, coalesce(r.name, 'Unknown') as relation, coalesce(t.name, t.id, 'Unknown') as tail LIMIT 10"
             ).data()
             
             for rel in sample_relationships:
-                head = rel['head'] or 'Unknown'
-                relation = rel['relation'] or 'Unknown'
-                tail = rel['tail'] or 'Unknown'
+                head = rel.get('head', 'Unknown')
+                relation = rel.get('relation', 'Unknown')
+                tail = rel.get('tail', 'Unknown')
                 console.print(f"  • {head} --[{relation}]--> {tail}")
             
             # Check graph connectivity metrics
@@ -605,14 +606,14 @@ def validate_neo4j_changes(baseline: Dict[str, Any]) -> Dict[str, Any]:
             
             # Get degree distribution for top entities
             top_connected = session.run(
-                "MATCH (n:Entity) RETURN n.name, size((n)-[:REL]-()) as degree ORDER BY degree DESC LIMIT 5"
+                "MATCH (n:Entity) RETURN coalesce(n.name, n.id, 'Unknown') as name, COUNT { (n)-[:REL]-() } as degree ORDER BY degree DESC LIMIT 5"
             ).data()
             
             console.print(f"  • Isolated entities (no connections): {isolated_entities:,}")
             console.print(f"  • Most connected entities:")
             for entity in top_connected:
-                name = entity['name'] or 'Unknown'
-                degree = entity['degree']
+                name = entity.get('name', 'Unknown')
+                degree = entity.get('degree', 0)
                 console.print(f"    - {name}: {degree} connections")
         
         driver.close()
@@ -750,12 +751,34 @@ def validate_faiss_changes(baseline: Dict[str, Any]) -> Dict[str, Any]:
         }
 
 def test_query_processing(question: str) -> Dict[str, Any]:
-    """Test query processing via API"""
+    """
+    Test the complete SubgraphRAG+ question answering pipeline
+    
+    This demonstrates the full RAG (Retrieval-Augmented Generation) workflow:
+    1. Entity extraction and linking
+    2. Hybrid retrieval (graph + dense)
+    3. MLP-based triple scoring and fusion
+    4. Subgraph assembly
+    5. LLM answer generation with citations
+    """
     logger.debug(f"Starting query processing test: {question}")
+    console.print(f"[cyan]🤔 Testing Question Answering Pipeline...[/cyan]")
+    console.print(f"[blue]❓ Question: [bold]{question}[/bold][/blue]")
     
     start_time = time.time()
     
     try:
+        console.print(f"\n[yellow]🚀 Sending query to SubgraphRAG+ API...[/yellow]")
+        console.print(f"[dim]This will trigger the complete RAG pipeline:[/dim]")
+        console.print(f"[dim]  1. Entity extraction from question[/dim]")
+        console.print(f"[dim]  2. Entity linking to knowledge graph[/dim]")
+        console.print(f"[dim]  3. Graph traversal retrieval[/dim]")
+        console.print(f"[dim]  4. Dense vector retrieval via FAISS[/dim]")
+        console.print(f"[dim]  5. MLP scoring and hybrid fusion[/dim]")
+        console.print(f"[dim]  6. Subgraph assembly[/dim]")
+        console.print(f"[dim]  7. LLM answer generation[/dim]")
+        console.print(f"[dim]  8. Citation extraction and validation[/dim]")
+        
         response = requests.post(
             f"{API_BASE_URL}/query",
             json={
@@ -768,6 +791,8 @@ def test_query_processing(question: str) -> Dict[str, Any]:
         )
         
         if response.status_code != 200:
+            console.print(f"[red]❌ Query failed with status {response.status_code}[/red]")
+            console.print(f"[red]Error: {response.text}[/red]")
             return {
                 'status': False,
                 'response_code': response.status_code,
@@ -775,12 +800,17 @@ def test_query_processing(question: str) -> Dict[str, Any]:
                 'processing_time_s': time.time() - start_time
             }
         
-        # Parse SSE stream
+        console.print(f"\n[green]✅ Query accepted, processing SSE stream...[/green]")
+        
+        # Parse SSE stream with detailed analysis
         events = []
         answer_tokens = []
         citations = []
         graph_data = None
         metadata = {}
+        errors = []
+        
+        console.print(f"[blue]📡 Real-time Stream Events:[/blue]")
         
         for line in response.iter_lines():
             if line:
@@ -790,22 +820,121 @@ def test_query_processing(question: str) -> Dict[str, Any]:
                         event_data = json.loads(line_str[6:])  # Remove 'data: ' prefix
                         events.append(event_data)
                         
-                        if event_data.get('event') == 'llm_token':
-                            answer_tokens.append(event_data['data']['token'])
-                        elif event_data.get('event') == 'citation_data':
-                            citations.append(event_data['data'])
-                        elif event_data.get('event') == 'graph_data':
-                            graph_data = event_data['data']
-                        elif event_data.get('event') == 'metadata':
+                        event_type = event_data.get('event')
+                        
+                        if event_type == 'metadata':
                             metadata.update(event_data['data'])
-                        elif event_data.get('event') == 'end':
+                            if 'query_id' in event_data['data']:
+                                console.print(f"  [dim]🆔 Query ID: {event_data['data']['query_id']}[/dim]")
+                            if 'triple_count' in event_data['data']:
+                                console.print(f"  [green]📊 Retrieved {event_data['data']['triple_count']} relevant triples[/green]")
+                            if 'entity_count' in event_data['data']:
+                                console.print(f"  [green]🏷️ Linked {event_data['data']['entity_count']} entities[/green]")
+                            if 'latency_ms' in event_data['data']:
+                                console.print(f"  [yellow]⏱️ Retrieval latency: {event_data['data']['latency_ms']}ms[/yellow]")
+                        
+                        elif event_type == 'graph_data':
+                            graph_data = event_data['data']
+                            node_count = len(graph_data.get('nodes', []))
+                            link_count = len(graph_data.get('links', []))
+                            console.print(f"  [blue]🕸️ Subgraph: {node_count} nodes, {link_count} edges[/blue]")
+                            
+                        elif event_type == 'llm_token':
+                            token = event_data['data']['token']
+                            answer_tokens.append(token)
+                            # Show streaming progress every 10 tokens
+                            if len(answer_tokens) % 10 == 0:
+                                partial_answer = ''.join(answer_tokens)
+                                console.print(f"  [green]💭 Generating... ({len(answer_tokens)} tokens)[/green]")
+                                
+                        elif event_type == 'citation_data':
+                            citation = event_data['data']
+                            citations.append(citation)
+                            console.print(f"  [cyan]📝 Citation: {citation.get('text', 'N/A')}[/cyan]")
+                            
+                        elif event_type == 'error':
+                            error_info = event_data['data']
+                            errors.append(error_info)
+                            console.print(f"  [red]❌ Error: {error_info.get('message', 'Unknown error')}[/red]")
+                            
+                        elif event_type == 'end':
+                            console.print(f"  [green]🏁 Stream completed[/green]")
                             break
                             
-                    except json.JSONDecodeError:
+                    except json.JSONDecodeError as e:
+                        console.print(f"  [yellow]⚠️ Failed to parse event: {line_str[:100]}[/yellow]")
                         continue
         
         processing_time = time.time() - start_time
         full_answer = ''.join(answer_tokens)
+        
+        # Detailed analysis of results
+        console.print(f"\n[blue]📋 Query Processing Results Analysis:[/blue]")
+        console.print(f"  [green]• Total processing time: {processing_time:.2f}s[/green]")
+        console.print(f"  [green]• Total SSE events received: {len(events)}[/green]")
+        console.print(f"  [green]• Answer tokens generated: {len(answer_tokens)}[/green]")
+        console.print(f"  [green]• Citations found: {len(citations)}[/green]")
+        console.print(f"  [green]• Graph data provided: {'✅ Yes' if graph_data else '❌ No'}[/green]")
+        console.print(f"  [green]• Errors encountered: {len(errors)}[/green]")
+        
+        if full_answer:
+            console.print(f"\n[blue]💬 Generated Answer:[/blue]")
+            # Show answer with word wrapping
+            answer_lines = full_answer.strip().split('\n')
+            for line in answer_lines:
+                if line.strip():
+                    console.print(f"  [dim]{line.strip()}[/dim]")
+        
+        if citations:
+            console.print(f"\n[blue]📚 Citations and Knowledge Sources:[/blue]")
+            for i, citation in enumerate(citations, 1):
+                console.print(f"  [{i}] {citation.get('text', 'N/A')}")
+                if 'id' in citation:
+                    console.print(f"      [dim]Triple ID: {citation['id']}[/dim]")
+        
+        if graph_data:
+            console.print(f"\n[blue]🕸️ Retrieved Subgraph Analysis:[/blue]")
+            nodes = graph_data.get('nodes', [])
+            links = graph_data.get('links', [])
+            
+            # Analyze node types
+            node_types = {}
+            for node in nodes:
+                node_type = node.get('type', 'Unknown')
+                node_types[node_type] = node_types.get(node_type, 0) + 1
+            
+            console.print(f"  • Node type distribution:")
+            for node_type, count in node_types.items():
+                console.print(f"    - {node_type}: {count} nodes")
+            
+            # Analyze relationship types
+            rel_types = {}
+            for link in links:
+                rel_type = link.get('relation_name', 'Unknown')
+                rel_types[rel_type] = rel_types.get(rel_type, 0) + 1
+            
+            console.print(f"  • Relationship type distribution:")
+            for rel_type, count in list(rel_types.items())[:5]:  # Top 5
+                console.print(f"    - {rel_type}: {count} relationships")
+        
+        # Quality assessment
+        quality_score = 0.0
+        if full_answer and len(full_answer) > 10:
+            quality_score += 0.4  # Has substantive answer
+        if citations:
+            quality_score += 0.3  # Has citations
+        if graph_data:
+            quality_score += 0.2  # Has graph data
+        if not errors:
+            quality_score += 0.1  # No errors
+        
+        console.print(f"\n[blue]🎯 Answer Quality Assessment:[/blue]")
+        console.print(f"  • Quality score: {quality_score:.2f}/1.0")
+        console.print(f"  • Answer completeness: {'✅ Good' if len(full_answer) > 50 else '⚠️ Short'}")
+        console.print(f"  • Citation support: {'✅ Good' if citations else '❌ Missing'}")
+        console.print(f"  • Graph context: {'✅ Provided' if graph_data else '❌ Missing'}")
+        
+        console.print(f"\n[green]✅ Query processing analysis complete![/green]")
         
         return {
             'status': True,
@@ -815,10 +944,13 @@ def test_query_processing(question: str) -> Dict[str, Any]:
             'graph_data': graph_data,
             'metadata': metadata,
             'total_events': len(events),
-            'answer_length': len(full_answer)
+            'answer_length': len(full_answer),
+            'quality_score': quality_score,
+            'errors': errors
         }
         
     except Exception as e:
+        console.print(f"[red]❌ Query processing failed: {e}[/red]")
         return {
             'status': False,
             'error': str(e),
@@ -830,11 +962,16 @@ def test_ie_extraction() -> Dict[str, Any]:
     logger.debug("Starting IE extraction test")
     
     # Note: This test will trigger REBEL model loading on first use
-    console.print("[yellow]Note: First IE extraction may take longer due to REBEL model loading...[/yellow]")
+    console.print("[yellow]⏳ Testing IE extraction (may trigger REBEL model loading)...[/yellow]")
+    console.print("[dim]This is a critical test - if it fails, document ingestion won't work.[/dim]")
+    console.print("[dim]REBEL model loading can take 5-10 minutes on first run.[/dim]")
     
     sample_text = "Barack Obama was born in Hawaii. He served as President of the United States."
     
     try:
+        console.print(f"[blue]📝 Test text: '{sample_text}'[/blue]")
+        console.print("[yellow]🚀 Sending to REBEL extraction endpoint...[/yellow]")
+        
         response = requests.post(
             f"{API_BASE_URL}/ie/extract",
             json={
@@ -843,10 +980,18 @@ def test_ie_extraction() -> Dict[str, Any]:
                 "num_beams": 3
             },
             headers={"X-API-KEY": API_KEY_SECRET},
-            timeout=TIMEOUT_SECONDS
+            timeout=MODEL_LOADING_TIMEOUT  # Use longer timeout for model loading
         )
         
         if response.status_code != 200:
+            console.print(f"[red]❌ IE extraction failed with status {response.status_code}[/red]")
+            console.print(f"[red]Error: {response.text}[/red]")
+            
+            # Check if it's a model loading issue
+            if "segmentation fault" in response.text.lower() or "memory" in response.text.lower():
+                console.print("[yellow]💡 This appears to be a model loading issue.[/yellow]")
+                console.print("[yellow]Consider running with smaller models or more memory.[/yellow]")
+            
             return {
                 'status': False,
                 'response_code': response.status_code,
@@ -1080,28 +1225,83 @@ def generate_report(results: ValidationResults) -> None:
 def check_services_and_provide_guidance(results: ValidationResults) -> bool:
     """Check if required services are running and provide guidance if not"""
     api_running = results.system_health.get('main_api', {}).get('status', False)
-    ie_running = results.system_health.get('ie_module', {}).get('status', False)
+    api_ready = results.system_health.get('main_api_ready', {}).get('status', False)
+    ie_available = results.system_health.get('ie_module', {}).get('status', False)
+    
+    # Check Neo4j and FAISS from readiness details if available
+    readiness_details = results.system_health.get('main_api_ready', {}).get('details', {})
+    
+    # Extract check results from readiness response
+    if isinstance(readiness_details, dict) and 'checks' in readiness_details:
+        checks = readiness_details['checks']
+        neo4j_available = checks.get('neo4j') == 'ok'
+        faiss_available = checks.get('faiss_index') == 'ok'
+    else:
+        # Fallback to baseline checks
+        neo4j_available = results.system_health.get('neo4j_baseline', {}).get('status', False)
+        faiss_available = results.system_health.get('faiss_baseline', {}).get('status', False)
+    
+    # Check critical dependencies
+    critical_issues = []
     
     if not api_running:
+        critical_issues.append("❌ Main API Server not responding")
+    
+    if not neo4j_available:
+        critical_issues.append("❌ Neo4j database not accessible")
+    
+    if not faiss_available:
+        critical_issues.append("❌ FAISS index not available")
+    
+    # Check readiness (less critical but important)
+    readiness_issues = []
+    
+    if api_running and not api_ready:
+        readiness_issues.append("⚠️ API server not fully ready (some models may not be loaded)")
+    
+    if not ie_available:
+        readiness_issues.append("⚠️ IE module not ready (REBEL model not loaded)")
+    
+    if critical_issues:
         console.print("\n")
         console.print(Panel(
-            "🚨 Required Service Not Running\n\n"
-            "The end-to-end test requires the main API server to be running:\n\n"
-            f"{'✅' if api_running else '❌'} Main API Server (port 8000) - includes IE module\n"
-            f"{'✅' if ie_running else '❌'} IE Module (/ie/ endpoints)\n\n"
-            "To start the service:\n\n"
-            "1. Start the main API server (includes IE functionality):\n"
+            "🚨 Critical Services Not Available\n\n"
+            "The end-to-end test requires these critical services:\n\n" +
+            "\n".join(critical_issues) + "\n\n"
+            "✅ Required Components:\n"
+            f"{'✅' if api_running else '❌'} Main API Server (port 8000)\n"
+            f"{'✅' if neo4j_available else '❌'} Neo4j Database\n"
+            f"{'✅' if faiss_available else '❌'} FAISS Vector Index\n\n"
+            "🔧 Setup Instructions:\n\n"
+            "1. Start the main API server:\n"
             "   python src/main.py --port 8000\n"
             "   # OR\n"
             "   uvicorn src.app.api:app --host 0.0.0.0 --port 8000\n\n"
-            "2. Re-run this test:\n"
+            "2. Ensure Neo4j is running and accessible\n"
+            "3. Ensure FAISS index exists at configured path\n"
+            "4. Re-run this test:\n"
             "   python scripts/end_to_end_test.py\n\n"
-            "Note: IE functionality is now integrated into the main API\n"
-            "as a service layer, no separate IE server needed.",
-            title="🔧 Service Setup Required",
-            border_style="yellow"
+            "Note: IE functionality is integrated into the main API.",
+            title="🔧 Critical Dependencies Missing",
+            border_style="red"
         ))
         return False
+    
+    if readiness_issues:
+        console.print("\n")
+        console.print(Panel(
+            "⚠️ Service Readiness Issues Detected\n\n"
+            "While critical services are running, some components need attention:\n\n" +
+            "\n".join(readiness_issues) + "\n\n"
+            "💡 These issues may cause some tests to fail, but the test will continue.\n"
+            "For full functionality, ensure all models are properly loaded.",
+            title="⚠️ Readiness Warnings",
+            border_style="yellow"
+        ))
+        # Continue execution but log warnings
+        for issue in readiness_issues:
+            results.add_warning(issue)
+    
     return True
 
 def main():
@@ -1147,13 +1347,34 @@ def main():
         if not check_services_and_provide_guidance(results):
             console.print("\n")
             console.print(Panel(
-                "Test completed with service availability issues.\n"
-                "Please start the required services and re-run the test.",
-                title="⚠️ Test Incomplete",
-                border_style="yellow"
+                "❌ Critical dependencies are missing or not accessible.\n\n"
+                "The end-to-end test cannot proceed without these services.\n"
+                "Please address the issues above and re-run the test.\n\n"
+                "💡 Tip: Start the API server first, then ensure Neo4j and FAISS are accessible.",
+                title="🛑 Test Aborted - Critical Dependencies Missing",
+                border_style="red"
             ))
+            logger.error("Test aborted due to missing critical dependencies")
             logger.info(f"Finished {__file__} at {datetime.now()}")
             sys.exit(1)
+        
+        # Additional pre-flight checks
+        console.print("\n")
+        console.print("[green]✅ Critical dependencies verified. Starting intensive tests...[/green]")
+        
+        # Warn about resource requirements
+        console.print("\n")
+        console.print(Panel(
+            "🧠 Resource Requirements Notice\n\n"
+            "The following tests will download and load large AI models:\n\n"
+            "• REBEL (Babelscape/rebel-large) - ~1.5GB\n"
+            "• Model loading may take 5-10 minutes on first run\n"
+            "• Requires sufficient RAM (recommended: 8GB+)\n\n"
+            "If you experience segmentation faults or memory errors,\n"
+            "consider running on a machine with more RAM or using smaller models.",
+            title="💡 Performance Notice",
+            border_style="blue"
+        ))
         
         # Step 4: Database Baseline
         task4 = progress.add_task("Getting database baseline...", total=100)

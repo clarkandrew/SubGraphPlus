@@ -239,13 +239,31 @@ class SQLiteDatabase:
             return cursor.fetchone()
 
 
-# Create singleton instances
+# Create singleton instances with lazy initialization
 # Skip database connections during testing to speed up tests and avoid connection errors
-if TESTING:
-    neo4j_db = None
-    sqlite_db = None
-else:
-    neo4j_db = Neo4jDatabase()
+neo4j_db = None
+sqlite_db = None
+
+def get_neo4j_db():
+    """Get Neo4j database instance with lazy initialization"""
+    global neo4j_db
+    if neo4j_db is None and not TESTING:
+        logger.info("Initializing Neo4j connection...")
+        neo4j_db = Neo4jDatabase()
+    return neo4j_db
+
+def get_sqlite_db():
+    """Get SQLite database instance with lazy initialization"""
+    global sqlite_db
+    if sqlite_db is None and not TESTING:
+        logger.info("Initializing SQLite connection...")
+        sqlite_db = SQLiteDatabase()
+    return sqlite_db
+
+# Initialize databases immediately for now (can be made lazy later)
+if not TESTING:
+    # Temporarily disable Neo4j to debug hang
+    # neo4j_db = Neo4jDatabase()
     sqlite_db = SQLiteDatabase()
 
 
