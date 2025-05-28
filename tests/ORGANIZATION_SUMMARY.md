@@ -1,167 +1,263 @@
-# Test Organization Summary
+# SubgraphRAG+ Test Organization Summary
 
-## Overview
-Successfully organized the SubgraphRAG+ test suite according to testing standards and best practices. The tests are now properly structured by type and feature/module for better maintainability and execution.
+This document summarizes the consolidated test structure following testing standards and best practices.
 
-## Final Structure
+## Test Structure Overview
 
 ```
 tests/
-├── README.md                   # Updated documentation
-├── conftest.py                 # Shared fixtures & config
-├── run_tests.py               # Test runner script (executable)
-├── Makefile                   # Convenient test commands
-├── ORGANIZATION_SUMMARY.md    # This summary
-│
-├── unit/                      # Pure unit tests, no I/O or ML models
+├── smoke/                          # Quick sanity checks (<30s total)
+│   ├── test_smoke_consolidated.py  # Main smoke tests for all components
+│   ├── test_ie_consolidated.py     # IE-specific smoke tests
+│   └── test_ie_real_models.py      # Real model loading tests (optional)
+├── unit/                           # Pure logic tests (<2 minutes)
+│   ├── services/
+│   │   ├── test_information_extraction.py
+│   │   └── test_ingestion.py
 │   ├── entity_typing/
-│   │   ├── __init__.py
-│   │   └── test_entity_typing.py
 │   ├── triple_extraction/
-│   │   ├── __init__.py
-│   │   └── test_triple_extraction.py
+│   ├── llm/
 │   ├── mlp/
-│   │   ├── __init__.py
-│   │   └── test_mlp.py
-│   ├── llm/
-│   │   ├── __init__.py
-│   │   └── test_llm.py
 │   └── utils/
-│       ├── __init__.py
-│       └── test_utils.py
-│
-├── integration/               # Tests that spin up components & talk over interfaces
+├── integration/                    # Real component interactions (<5 minutes)
 │   ├── api/
-│   │   ├── __init__.py
-│   │   └── test_api.py
+│   │   └── test_ie_endpoints.py
 │   ├── embedder/
-│   │   ├── __init__.py
-│   │   └── test_embedder.py
 │   ├── retriever/
-│   │   ├── __init__.py
-│   │   └── test_retriever.py
-│   ├── llm/
-│   │   ├── __init__.py
-│   │   └── test_llm_integration.py
 │   └── general/
-│       ├── __init__.py
-│       └── test_integration.py
-│
-├── e2e/                       # Full-system smoke & domain workflows
-│   └── llm_functionality/
-│       ├── __init__.py
-│       └── test_llm_real_functionality.py
-│
-├── performance/               # Load & latency benchmarks
-│   ├── __init__.py
-│   └── test_llm_performance.py
-│
-├── adversarial/               # Edge-case and adversarial robustness tests
-│   ├── __init__.py
-│   └── test_adversarial.py
-│
-├── smoke/                     # Very quick sanity checks
-│   ├── __init__.py
-│   ├── test_smoke.py
-│   ├── test_basic.py
-│   ├── test_minimal.py
-│   ├── test_ultra_minimal.py
-│   └── test_fast.py
-│
-└── fixtures/                  # Static data & mocks
-    ├── __init__.py
-    ├── expected_responses.json
-    └── sample_prompts.json
+├── e2e/                           # End-to-end system flows (<10 minutes)
+│   └── test_ie_pipeline_e2e.py
+├── performance/                   # Load and latency benchmarks
+├── adversarial/                   # Robustness and edge cases
+├── fixtures/                      # Test data and configurations
+├── conftest.py                    # Shared fixtures and configuration
+├── run_tests.py                   # Comprehensive test runner
+├── Makefile                       # Convenient test commands
+└── README.md                      # Test documentation
 ```
 
-## Key Improvements
+## Consolidation Changes Made
 
-### 1. Hierarchical Organization
-- **By Test Type**: Clear separation of unit, integration, e2e, performance, adversarial, and smoke tests
-- **By Feature/Module**: Within each type, tests are grouped by feature (entity_typing, triple_extraction, mlp, llm, utils, api, embedder, retriever)
-- **No Top-Level Orphans**: All test files are properly organized in directories
+### Removed Duplicate Files
+- **Smoke Tests**: Consolidated 17 duplicate IE smoke test files into 2 clean files
+- **Debug Files**: Removed all debug test files (test_ie_debug*.py)
+- **Minimal Tests**: Removed redundant minimal test variations
+- **Old Runners**: Removed old IE-specific test runner
 
-### 2. Testing Standards Compliance
-- ✅ **Within each type, group by feature/module**
-- ✅ **No top-level orphaned test files**
-- ✅ **Fixtures and test-data stored under fixtures/**
-- ✅ **Proper Python package structure** with `__init__.py` files
+### Consolidated Files
+1. **`test_smoke_consolidated.py`**: Main smoke tests covering:
+   - Basic app functionality
+   - API endpoints
+   - Information extraction
+   - Input sanitization
+   - Error handling
+   - Performance basics
+   - Concurrency
+   - Configuration
 
-### 3. Enhanced Tooling
+2. **`test_ie_consolidated.py`**: IE-specific smoke tests covering:
+   - Import validation
+   - Service instantiation
+   - Singleton pattern
+   - Model loading (when enabled)
+   - Extraction functionality
+   - Error handling
+   - Performance characteristics
 
-#### Test Runner Script (`run_tests.py`)
-- Follows project logging standards with `from src.app.log import logger`
-- Provides organized test execution with proper logging
-- Supports feature-specific test runs
-- Includes debug tracing for execution steps
-- Rich error handling and reporting
+### Updated Infrastructure
+1. **`run_tests.py`**: Comprehensive test runner with:
+   - Proper test suite categorization
+   - Timeout handling
+   - Environment setup
+   - Rich logging and reporting
+   - Coverage support
+   - Debug modes
 
-#### Makefile
-- Convenient commands for all test types
-- Feature-specific test execution
-- CI/CD integration targets
-- Development utilities (coverage, clean, debug)
+2. **`Makefile`**: Clean targets following standards:
+   - Individual test suite targets
+   - Coverage reporting
+   - CI/CD targets
+   - Development helpers
 
-### 4. Updated Documentation
-- **README.md**: Updated to reflect new structure and organization
-- **Clear categorization**: Each test type has purpose, organization, and characteristics documented
-- **Running instructions**: Updated for new structure with feature-specific examples
+## Test Categories and Standards
 
-## Usage Examples
+### Smoke Tests (tests/smoke/)
+- **Purpose**: Quick validation that core functionality works
+- **Duration**: <30 seconds total
+- **Scope**: Basic operations, health checks, configuration validation
+- **Execution**: Parallel where possible
 
-### Run Tests by Type
+### Unit Tests (tests/unit/)
+- **Purpose**: Test individual functions and classes in isolation
+- **Duration**: <2 minutes total
+- **Scope**: Pure logic, minimal external dependencies
+- **Mocking**: Only for true externalities (network, file system, time)
+
+### Integration Tests (tests/integration/)
+- **Purpose**: Test real interactions between components
+- **Duration**: <5 minutes total
+- **Scope**: API endpoints, database operations, service integrations
+- **Mocking**: Minimal - prefer real implementations
+
+### End-to-End Tests (tests/e2e/)
+- **Purpose**: Test complete user workflows
+- **Duration**: <10 minutes total
+- **Scope**: Full system behavior from input to output
+- **Mocking**: None - test the real system
+
+### Performance Tests (tests/performance/)
+- **Purpose**: Validate latency, throughput, and resource usage
+- **Scope**: Load testing, memory profiling, concurrent operations
+- **Metrics**: Response times, memory usage, CPU utilization
+
+### Adversarial Tests (tests/adversarial/)
+- **Purpose**: Test system robustness and edge cases
+- **Scope**: Malformed inputs, boundary conditions, error scenarios
+- **Focus**: Security, stability, graceful degradation
+
+## Running Tests
+
+### Quick Commands
 ```bash
-# Quick smoke tests
-make test-smoke
+# Default (smoke tests)
+make test
 
-# Unit tests with coverage
+# Specific test suites
 make test-unit
-
-# Integration tests
 make test-integration
+make test-e2e
 
-# All fast tests (recommended for development)
-make test-fast
+# With coverage
+make test-coverage
+
+# All tests
+make test-all
 ```
 
-### Run Tests by Feature
+### Advanced Usage
 ```bash
-# All LLM tests (unit + integration + e2e)
-make test-llm
+# Using the test runner directly
+python tests/run_tests.py --suite smoke
+python tests/run_tests.py --suite unit --verbose
+python tests/run_tests.py --suite all --coverage
 
-# Entity typing tests
-make test-entity
-
-# API tests
-make test-api
+# List available suites
+python tests/run_tests.py --list-suites
 ```
 
-### Using Test Runner Directly
+## Environment Configuration
+
+### Test Environment Variables
+- `TESTING=1`: Enable testing mode
+- `SUBGRAPHRAG_DISABLE_MODEL_LOADING=true`: Disable model loading for tests
+- `TOKENIZERS_PARALLELISM=false`: Prevent threading issues
+- `PYTORCH_ENABLE_MPS_FALLBACK=1`: Apple Silicon compatibility
+
+### Model Loading Strategy
+- **Unit/Smoke Tests**: Models disabled by default to prevent segfaults
+- **Integration Tests**: Can enable models with environment variable
+- **E2E Tests**: Use real models when available
+- **Performance Tests**: Real models for accurate benchmarks
+
+## Best Practices Implemented
+
+### Testing Philosophy
+- ✅ Test behavior, not implementation
+- ✅ Maximize realism (minimal mocking)
+- ✅ Comprehensive coverage (normal, edge, error flows)
+- ✅ Fast feedback (smoke tests first)
+
+### Test Implementation
+- ✅ One behavior per test
+- ✅ Arrange-Act-Assert structure
+- ✅ Meaningful test names
+- ✅ Clear assertions with descriptive messages
+
+### Mocking Guidelines
+- ✅ Mock only externalities
+- ✅ Never mock own code
+- ✅ Document all mocks
+- ✅ Prefer real implementations
+
+### Performance Considerations
+- ✅ Fast unit tests (<1s each)
+- ✅ Parallel execution where safe
+- ✅ Proper resource cleanup
+- ✅ Timeout protection
+
+## Quality Metrics
+
+### Coverage Targets
+- Unit Tests: >95% line coverage
+- Integration Tests: >90% feature coverage
+- E2E Tests: >80% user workflow coverage
+
+### Performance Budgets
+- Unit Test Suite: <2 minutes
+- Integration Test Suite: <5 minutes
+- E2E Test Suite: <10 minutes
+- Smoke Test Suite: <30 seconds
+
+### Quality Gates
+- All tests must pass before merge
+- Coverage cannot decrease
+- Performance budgets enforced
+- No skipped tests without justification
+
+## Information Extraction (IE) Testing
+
+### IE Test Strategy
+- **Real Models**: Use cached models for integration/e2e tests
+- **Mocked Models**: Use mocks for unit tests to avoid model loading overhead
+- **Performance**: Measure extraction speed and memory usage
+- **Robustness**: Test with various text inputs and edge cases
+
+### IE-Specific Considerations
+- Model loading disabled by default to prevent Apple Silicon segfaults
+- Threading conflicts avoided with proper environment variables
+- FastAPI TestClient issues worked around with mocking
+- Real model tests available when explicitly enabled
+
+## Continuous Integration
+
+### CI Test Execution
+- All test categories run on every PR
+- Coverage enforcement (>90% for critical modules)
+- Performance regression detection
+- Flake rate monitoring (<1%)
+
+### CI Targets
 ```bash
-# Run all tests for a specific feature
-python run_tests.py --feature llm
-
-# Run fast tests only
-python run_tests.py all --fast
-
-# Run with specific markers
-python run_tests.py unit --markers "not slow"
+make ci-smoke      # Quick CI validation
+make ci-unit       # Unit tests with coverage
+make ci-integration # Integration tests
+make ci-all        # Full CI test suite
 ```
 
-## Benefits Achieved
+## Development Workflow
 
-1. **Better Organization**: Tests are logically grouped by type and feature
-2. **Faster Discovery**: Easy to find tests for specific components
-3. **Selective Execution**: Run only the tests you need during development
-4. **CI/CD Ready**: Clear separation of fast vs slow tests for different pipeline stages
-5. **Standards Compliance**: Follows established testing best practices
-6. **Maintainability**: Clear structure makes it easy to add new tests in the right place
+### Development Targets
+```bash
+make dev-fast      # Quick development tests
+make dev-ie        # IE-specific tests
+make dev-watch     # Watch mode for TDD
+```
 
-## Next Steps
+### Test-Driven Development
+1. Write failing test first
+2. Implement minimal fix
+3. Refactor for clarity
+4. Run full suite before commit
 
-1. **Add Test Markers**: Consider adding pytest markers for better test selection
-2. **Performance Budgets**: Set up automated performance regression detection
-3. **Coverage Tracking**: Implement coverage drift alerts
-4. **Test Health Monitoring**: Track flaky tests and execution times
+## Maintenance
 
-This organization provides a solid foundation for maintaining high-quality tests that scale with the project. 
+### Regular Tasks
+- Quarterly test audits to prune obsolete tests
+- Performance budget reviews
+- Flake rate monitoring and fixes
+- Coverage drift alerts
+
+### Test Health Metrics
+- Flake Rate: <1%
+- Test Maintenance Ratio: <10% of development time
+- Bug Escape Rate: <5% of releases 

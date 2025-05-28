@@ -147,6 +147,8 @@ class SQLiteDatabase:
             h_text TEXT NOT NULL,
             r_text TEXT NOT NULL,
             t_text TEXT NOT NULL,
+            source TEXT DEFAULT 'unknown',
+            metadata TEXT,
             status TEXT DEFAULT 'pending',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             processed_at TIMESTAMP,
@@ -154,6 +156,7 @@ class SQLiteDatabase:
         );
         CREATE INDEX IF NOT EXISTS idx_staging_status ON staging_triples(status);
         CREATE INDEX IF NOT EXISTS idx_staging_created_at ON staging_triples(created_at);
+        CREATE INDEX IF NOT EXISTS idx_staging_source ON staging_triples(source);
         
         CREATE TABLE IF NOT EXISTS api_keys (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -175,12 +178,33 @@ class SQLiteDatabase:
             query_id TEXT NOT NULL,
             is_correct BOOLEAN NOT NULL,
             comment TEXT,
+            expected_answer TEXT,
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         );
         """
         
         with self._lock:
             self._connection.executescript(schema_sql)
+            # Run migrations to handle schema updates
+            self._run_migrations()
+    
+    def _run_migrations(self):
+        """Run database migrations for schema updates"""
+        try:
+            # Migration 1: Add expected_answer column to feedback table if it doesn't exist
+            cursor = self._connection.cursor()
+            cursor.execute("PRAGMA table_info(feedback)")
+            columns = [column[1] for column in cursor.fetchall()]
+            
+            if 'expected_answer' not in columns:
+                logger.info("Adding expected_answer column to feedback table")
+                cursor.execute("ALTER TABLE feedback ADD COLUMN expected_answer TEXT")
+                self._connection.commit()
+                logger.info("Migration completed: added expected_answer column")
+            
+        except Exception as e:
+            logger.error(f"Error running migrations: {e}")
+            # Don't raise the error as this might be a new database
     
     def verify_connectivity(self):
         """Test SQLite connection"""

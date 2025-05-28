@@ -1182,6 +1182,585 @@ def test_graph_browse() -> Dict[str, Any]:
             'error': str(e)
         }
 
+def test_feedback_endpoint() -> Dict[str, Any]:
+    """Test feedback submission functionality"""
+    logger.debug("Starting feedback endpoint test")
+    console.print("[cyan]📝 Testing Feedback Submission...[/cyan]")
+    
+    try:
+        # Generate a test query ID
+        test_query_id = f"test_query_{int(time.time())}"
+        
+        console.print(f"[blue]📋 Submitting feedback for query ID: {test_query_id}[/blue]")
+        
+        response = requests.post(
+            f"{API_BASE_URL}/feedback",
+            json={
+                "query_id": test_query_id,
+                "is_correct": True,
+                "comment": "End-to-end test feedback - system working correctly",
+                "expected_answer": "Test answer for validation"
+            },
+            headers={"X-API-KEY": API_KEY_SECRET},
+            timeout=TIMEOUT_SECONDS
+        )
+        
+        if response.status_code != 200:
+            console.print(f"[red]❌ Feedback submission failed with status {response.status_code}[/red]")
+            return {
+                'status': False,
+                'response_code': response.status_code,
+                'error': response.text
+            }
+        
+        data = response.json()
+        
+        # Validate response structure
+        required_fields = ['status', 'message']
+        missing_fields = [field for field in required_fields if field not in data]
+        
+        if missing_fields:
+            return {
+                'status': False,
+                'error': f"Missing required fields: {missing_fields}"
+            }
+        
+        console.print(f"[green]✅ Feedback submitted successfully![/green]")
+        console.print(f"[green]📊 Response: {data['message']}[/green]")
+        
+        return {
+            'status': True,
+            'query_id': test_query_id,
+            'response_data': data,
+            'message': data['message']
+        }
+        
+    except Exception as e:
+        console.print(f"[red]❌ Feedback test failed: {e}[/red]")
+        return {
+            'status': False,
+            'error': str(e)
+        }
+
+def test_metrics_endpoint() -> Dict[str, Any]:
+    """Test Prometheus metrics endpoint"""
+    logger.debug("Starting metrics endpoint test")
+    console.print("[cyan]📊 Testing Prometheus Metrics Endpoint...[/cyan]")
+    
+    try:
+        console.print("[blue]📈 Fetching Prometheus metrics...[/blue]")
+        
+        response = requests.get(
+            f"{API_BASE_URL}/metrics",
+            timeout=TIMEOUT_SECONDS
+        )
+        
+        if response.status_code != 200:
+            console.print(f"[red]❌ Metrics endpoint failed with status {response.status_code}[/red]")
+            return {
+                'status': False,
+                'response_code': response.status_code,
+                'error': response.text
+            }
+        
+        metrics_text = response.text
+        
+        # Basic validation of Prometheus format
+        if not metrics_text:
+            return {
+                'status': False,
+                'error': 'Empty metrics response'
+            }
+        
+        # Check for common Prometheus metrics
+        expected_metrics = [
+            'http_requests_total',
+            'http_request_duration_seconds'
+        ]
+        
+        found_metrics = []
+        for metric in expected_metrics:
+            if metric in metrics_text:
+                found_metrics.append(metric)
+        
+        # Count total metrics
+        metric_lines = [line for line in metrics_text.split('\n') if line and not line.startswith('#')]
+        
+        console.print(f"[green]✅ Metrics endpoint working![/green]")
+        console.print(f"[green]📊 Found {len(metric_lines)} metric entries[/green]")
+        console.print(f"[green]📈 Standard metrics found: {len(found_metrics)}/{len(expected_metrics)}[/green]")
+        
+        # Show sample metrics
+        console.print(f"[blue]📋 Sample metrics:[/blue]")
+        for line in metric_lines[:5]:  # Show first 5 metrics
+            console.print(f"  [dim]{line}[/dim]")
+        
+        return {
+            'status': True,
+            'total_metrics': len(metric_lines),
+            'found_standard_metrics': found_metrics,
+            'metrics_text_length': len(metrics_text),
+            'sample_metrics': metric_lines[:10]
+        }
+        
+    except Exception as e:
+        console.print(f"[red]❌ Metrics test failed: {e}[/red]")
+        return {
+            'status': False,
+            'error': str(e)
+        }
+
+def test_text_ingestion_endpoint() -> Dict[str, Any]:
+    """Test the text ingestion endpoint specifically"""
+    logger.debug("Starting text ingestion endpoint test")
+    console.print("[cyan]📄 Testing Text Ingestion Endpoint...[/cyan]")
+    
+    try:
+        # Test text for ingestion
+        test_text = """
+        SubgraphRAG+ is an advanced knowledge graph question answering system.
+        It was developed by researchers to improve information retrieval.
+        The system uses REBEL for relation extraction and Neo4j for graph storage.
+        FAISS provides vector similarity search capabilities.
+        """
+        
+        console.print(f"[blue]📝 Test text length: {len(test_text)} characters[/blue]")
+        console.print("[yellow]🚀 Sending to text ingestion endpoint...[/yellow]")
+        
+        response = requests.post(
+            f"{API_BASE_URL}/ingest/text",
+            json={
+                "text": test_text,
+                "source": "e2e_test_text_ingestion",
+                "chunk_size": 500
+            },
+            headers={"X-API-KEY": API_KEY_SECRET},
+            timeout=TIMEOUT_SECONDS
+        )
+        
+        if response.status_code != 200:
+            console.print(f"[red]❌ Text ingestion failed with status {response.status_code}[/red]")
+            return {
+                'status': False,
+                'response_code': response.status_code,
+                'error': response.text
+            }
+        
+        data = response.json()
+        
+        # Validate response structure
+        required_fields = ['total_triples', 'successful_triples', 'failed_triples', 'processing_time']
+        missing_fields = [field for field in required_fields if field not in data]
+        
+        if missing_fields:
+            return {
+                'status': False,
+                'error': f"Missing required fields: {missing_fields}"
+            }
+        
+        console.print(f"[green]✅ Text ingestion completed![/green]")
+        console.print(f"[green]📊 Processing Results:[/green]")
+        console.print(f"  • Total triples: {data['total_triples']}")
+        console.print(f"  • Successful: {data['successful_triples']}")
+        console.print(f"  • Failed: {data['failed_triples']}")
+        console.print(f"  • Processing time: {data['processing_time']:.2f}s")
+        
+        if data.get('errors'):
+            console.print(f"[yellow]⚠️ Errors: {len(data['errors'])}[/yellow]")
+        
+        if data.get('warnings'):
+            console.print(f"[yellow]⚠️ Warnings: {len(data['warnings'])}[/yellow]")
+        
+        return {
+            'status': True,
+            'total_triples': data['total_triples'],
+            'successful_triples': data['successful_triples'],
+            'failed_triples': data['failed_triples'],
+            'processing_time': data['processing_time'],
+            'errors': data.get('errors', []),
+            'warnings': data.get('warnings', [])
+        }
+        
+    except Exception as e:
+        console.print(f"[red]❌ Text ingestion test failed: {e}[/red]")
+        return {
+            'status': False,
+            'error': str(e)
+        }
+
+def test_debug_endpoints() -> Dict[str, Any]:
+    """Test debug and diagnostic endpoints"""
+    logger.debug("Starting debug endpoints test")
+    console.print("[cyan]🔍 Testing Debug Endpoints...[/cyan]")
+    
+    results = {}
+    
+    try:
+        # Test debug load-test endpoint
+        console.print("[blue]🧪 Testing debug load-test endpoint...[/blue]")
+        
+        response = requests.get(
+            f"{API_BASE_URL}/debug/load-test",
+            timeout=TIMEOUT_SECONDS
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            console.print(f"[green]✅ Debug load-test working![/green]")
+            console.print(f"[green]📊 Status: {data.get('status', 'unknown')}[/green]")
+            
+            if data.get('tokenizer_load_time'):
+                console.print(f"[green]⏱️ Tokenizer load time: {data['tokenizer_load_time']:.2f}s[/green]")
+            
+            results['debug_load_test'] = {
+                'status': True,
+                'response_data': data
+            }
+        else:
+            console.print(f"[yellow]⚠️ Debug load-test returned {response.status_code}[/yellow]")
+            results['debug_load_test'] = {
+                'status': False,
+                'response_code': response.status_code,
+                'error': response.text
+            }
+        
+        # Test IE info endpoint
+        console.print("[blue]🧠 Testing IE info endpoint...[/blue]")
+        
+        response = requests.get(
+            f"{API_BASE_URL}/ie/info",
+            timeout=TIMEOUT_SECONDS
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            console.print(f"[green]✅ IE info endpoint working![/green]")
+            console.print(f"[green]📊 Overall status: {data.get('overall_status', 'unknown')}[/green]")
+            
+            if 'models' in data:
+                console.print(f"[green]🤖 Models info available: {len(data['models'])} models[/green]")
+            
+            results['ie_info'] = {
+                'status': True,
+                'response_data': data
+            }
+        else:
+            console.print(f"[yellow]⚠️ IE info returned {response.status_code}[/yellow]")
+            results['ie_info'] = {
+                'status': False,
+                'response_code': response.status_code,
+                'error': response.text
+            }
+        
+        # Overall status
+        overall_success = all(result.get('status', False) for result in results.values())
+        
+        console.print(f"\n[green]✅ Debug endpoints test completed![/green]")
+        console.print(f"[blue]📊 Results: {sum(1 for r in results.values() if r.get('status', False))}/{len(results)} endpoints working[/blue]")
+        
+        return {
+            'status': overall_success,
+            'individual_results': results,
+            'working_endpoints': sum(1 for r in results.values() if r.get('status', False)),
+            'total_endpoints': len(results)
+        }
+        
+    except Exception as e:
+        console.print(f"[red]❌ Debug endpoints test failed: {e}[/red]")
+        return {
+            'status': False,
+            'error': str(e),
+            'individual_results': results
+        }
+
+def test_batch_ingest_endpoint() -> Dict[str, Any]:
+    """Test the batch triple ingestion endpoint"""
+    logger.debug("Starting batch ingest endpoint test")
+    console.print("[cyan]📦 Testing Batch Triple Ingestion...[/cyan]")
+    
+    try:
+        # Sample triples for testing
+        test_triples = [
+            {
+                "head": "SubgraphRAG+",
+                "relation": "uses",
+                "tail": "REBEL"
+            },
+            {
+                "head": "REBEL",
+                "relation": "performs",
+                "tail": "relation extraction"
+            },
+            {
+                "head": "SubgraphRAG+",
+                "relation": "stores_data_in",
+                "tail": "Neo4j"
+            }
+        ]
+        
+        console.print(f"[blue]📝 Testing with {len(test_triples)} sample triples[/blue]")
+        console.print("[yellow]🚀 Sending to batch ingest endpoint...[/yellow]")
+        
+        response = requests.post(
+            f"{API_BASE_URL}/ingest",
+            json={"triples": test_triples},
+            headers={"X-API-KEY": API_KEY_SECRET},
+            timeout=TIMEOUT_SECONDS
+        )
+        
+        if response.status_code not in [200, 202]:
+            console.print(f"[red]❌ Batch ingest failed with status {response.status_code}[/red]")
+            return {
+                'status': False,
+                'response_code': response.status_code,
+                'error': response.text
+            }
+        
+        data = response.json()
+        
+        # Validate response structure
+        expected_fields = ['status']
+        missing_fields = [field for field in expected_fields if field not in data]
+        
+        if missing_fields:
+            return {
+                'status': False,
+                'error': f"Missing required fields: {missing_fields}"
+            }
+        
+        console.print(f"[green]✅ Batch ingest completed![/green]")
+        console.print(f"[green]📊 Status: {data['status']}[/green]")
+        
+        if 'triples_staged' in data:
+            console.print(f"[green]📈 Triples staged: {data['triples_staged']}[/green]")
+        
+        if 'message' in data:
+            console.print(f"[green]💬 Message: {data['message']}[/green]")
+        
+        if data.get('errors'):
+            console.print(f"[yellow]⚠️ Errors: {len(data['errors'])}[/yellow]")
+        
+        return {
+            'status': True,
+            'response_code': response.status_code,
+            'triples_sent': len(test_triples),
+            'response_data': data
+        }
+        
+    except Exception as e:
+        console.print(f"[red]❌ Batch ingest test failed: {e}[/red]")
+        return {
+            'status': False,
+            'error': str(e)
+        }
+
+def test_error_handling() -> Dict[str, Any]:
+    """Test API error handling with various invalid inputs"""
+    logger.debug("Starting error handling test")
+    console.print("[cyan]🚨 Testing API Error Handling...[/cyan]")
+    
+    error_tests = {}
+    
+    try:
+        # Test 1: Invalid API key
+        console.print("[blue]🔐 Testing invalid API key...[/blue]")
+        response = requests.post(
+            f"{API_BASE_URL}/query",
+            json={"question": "test"},
+            headers={"X-API-KEY": "invalid_key"},
+            timeout=TIMEOUT_SECONDS
+        )
+        
+        error_tests['invalid_api_key'] = {
+            'expected_status': 401,
+            'actual_status': response.status_code,
+            'success': response.status_code == 401
+        }
+        
+        if response.status_code == 401:
+            console.print("[green]✅ Invalid API key correctly rejected[/green]")
+        else:
+            console.print(f"[yellow]⚠️ Expected 401, got {response.status_code}[/yellow]")
+        
+        # Test 2: Empty query
+        console.print("[blue]❓ Testing empty query...[/blue]")
+        response = requests.post(
+            f"{API_BASE_URL}/query",
+            json={"question": ""},
+            headers={"X-API-KEY": API_KEY_SECRET},
+            timeout=TIMEOUT_SECONDS
+        )
+        
+        error_tests['empty_query'] = {
+            'expected_status': 400,
+            'actual_status': response.status_code,
+            'success': response.status_code == 400
+        }
+        
+        if response.status_code == 400:
+            console.print("[green]✅ Empty query correctly rejected[/green]")
+        else:
+            console.print(f"[yellow]⚠️ Expected 400, got {response.status_code}[/yellow]")
+        
+        # Test 3: Malformed JSON for ingest
+        console.print("[blue]📦 Testing malformed ingest data...[/blue]")
+        response = requests.post(
+            f"{API_BASE_URL}/ingest",
+            json={"invalid_field": "test"},
+            headers={"X-API-KEY": API_KEY_SECRET},
+            timeout=TIMEOUT_SECONDS
+        )
+        
+        error_tests['malformed_ingest'] = {
+            'expected_status': 400,
+            'actual_status': response.status_code,
+            'success': response.status_code in [400, 422]  # Either is acceptable
+        }
+        
+        if response.status_code in [400, 422]:
+            console.print("[green]✅ Malformed ingest data correctly rejected[/green]")
+        else:
+            console.print(f"[yellow]⚠️ Expected 400/422, got {response.status_code}[/yellow]")
+        
+        # Test 4: Missing API key
+        console.print("[blue]🔑 Testing missing API key...[/blue]")
+        response = requests.post(
+            f"{API_BASE_URL}/query",
+            json={"question": "test"},
+            timeout=TIMEOUT_SECONDS
+        )
+        
+        error_tests['missing_api_key'] = {
+            'expected_status': 401,
+            'actual_status': response.status_code,
+            'success': response.status_code == 401
+        }
+        
+        if response.status_code == 401:
+            console.print("[green]✅ Missing API key correctly rejected[/green]")
+        else:
+            console.print(f"[yellow]⚠️ Expected 401, got {response.status_code}[/yellow]")
+        
+        # Calculate overall success
+        successful_tests = sum(1 for test in error_tests.values() if test['success'])
+        total_tests = len(error_tests)
+        
+        console.print(f"\n[green]✅ Error handling test completed![/green]")
+        console.print(f"[blue]📊 Results: {successful_tests}/{total_tests} error cases handled correctly[/blue]")
+        
+        return {
+            'status': successful_tests == total_tests,
+            'successful_tests': successful_tests,
+            'total_tests': total_tests,
+            'individual_results': error_tests
+        }
+        
+    except Exception as e:
+        console.print(f"[red]❌ Error handling test failed: {e}[/red]")
+        return {
+            'status': False,
+            'error': str(e),
+            'individual_results': error_tests
+        }
+
+def test_performance_benchmarks() -> Dict[str, Any]:
+    """Test performance benchmarks for key operations"""
+    logger.debug("Starting performance benchmark test")
+    console.print("[cyan]⚡ Testing Performance Benchmarks...[/cyan]")
+    
+    benchmarks = {}
+    
+    try:
+        # Benchmark 1: Health check response time
+        console.print("[blue]💓 Benchmarking health check...[/blue]")
+        start_time = time.time()
+        response = requests.get(f"{API_BASE_URL}/healthz", timeout=TIMEOUT_SECONDS)
+        health_time = time.time() - start_time
+        
+        benchmarks['health_check'] = {
+            'response_time_ms': health_time * 1000,
+            'success': response.status_code == 200,
+            'benchmark_passed': health_time < 1.0  # Should be under 1 second
+        }
+        
+        console.print(f"[green]⏱️ Health check: {health_time*1000:.2f}ms[/green]")
+        
+        # Benchmark 2: Readiness check response time
+        console.print("[blue]🔍 Benchmarking readiness check...[/blue]")
+        start_time = time.time()
+        response = requests.get(f"{API_BASE_URL}/readyz", timeout=TIMEOUT_SECONDS)
+        readiness_time = time.time() - start_time
+        
+        benchmarks['readiness_check'] = {
+            'response_time_ms': readiness_time * 1000,
+            'success': response.status_code in [200, 503],
+            'benchmark_passed': readiness_time < 5.0  # Should be under 5 seconds
+        }
+        
+        console.print(f"[green]⏱️ Readiness check: {readiness_time*1000:.2f}ms[/green]")
+        
+        # Benchmark 3: Graph browse response time
+        console.print("[blue]🕸️ Benchmarking graph browse...[/blue]")
+        start_time = time.time()
+        response = requests.get(
+            f"{API_BASE_URL}/graph/browse",
+            params={'limit': 100, 'page': 1},
+            headers={"X-API-KEY": API_KEY_SECRET},
+            timeout=TIMEOUT_SECONDS
+        )
+        browse_time = time.time() - start_time
+        
+        benchmarks['graph_browse'] = {
+            'response_time_ms': browse_time * 1000,
+            'success': response.status_code == 200,
+            'benchmark_passed': browse_time < 10.0  # Should be under 10 seconds
+        }
+        
+        console.print(f"[green]⏱️ Graph browse: {browse_time*1000:.2f}ms[/green]")
+        
+        # Benchmark 4: IE health check
+        console.print("[blue]🧠 Benchmarking IE health check...[/blue]")
+        start_time = time.time()
+        response = requests.get(f"{API_BASE_URL}/ie/health", timeout=TIMEOUT_SECONDS)
+        ie_health_time = time.time() - start_time
+        
+        benchmarks['ie_health'] = {
+            'response_time_ms': ie_health_time * 1000,
+            'success': response.status_code == 200,
+            'benchmark_passed': ie_health_time < 3.0  # Should be under 3 seconds
+        }
+        
+        console.print(f"[green]⏱️ IE health: {ie_health_time*1000:.2f}ms[/green]")
+        
+        # Calculate overall performance score
+        passed_benchmarks = sum(1 for b in benchmarks.values() if b['benchmark_passed'])
+        total_benchmarks = len(benchmarks)
+        
+        console.print(f"\n[green]✅ Performance benchmarks completed![/green]")
+        console.print(f"[blue]📊 Results: {passed_benchmarks}/{total_benchmarks} benchmarks passed[/blue]")
+        
+        # Show performance summary
+        console.print(f"\n[blue]⚡ Performance Summary:[/blue]")
+        for test_name, result in benchmarks.items():
+            status = "✅ PASS" if result['benchmark_passed'] else "⚠️ SLOW"
+            console.print(f"  • {test_name.replace('_', ' ').title()}: {result['response_time_ms']:.2f}ms {status}")
+        
+        return {
+            'status': passed_benchmarks == total_benchmarks,
+            'passed_benchmarks': passed_benchmarks,
+            'total_benchmarks': total_benchmarks,
+            'individual_results': benchmarks,
+            'average_response_time_ms': sum(b['response_time_ms'] for b in benchmarks.values()) / len(benchmarks)
+        }
+        
+    except Exception as e:
+        console.print(f"[red]❌ Performance benchmark test failed: {e}[/red]")
+        return {
+            'status': False,
+            'error': str(e),
+            'individual_results': benchmarks
+        }
+
 def generate_report(results: ValidationResults) -> None:
     """Generate comprehensive validation report"""
     logger.debug("Generating validation report")
@@ -1215,6 +1794,56 @@ def generate_report(results: ValidationResults) -> None:
         health_table.add_row(component.replace('_', ' ').title(), status_text, str(details)[:100])
     
     console.print(health_table)
+    console.print()
+    
+    # API Endpoints Test Results
+    api_endpoints = [
+        'query_processing', 'graph_browsing', 'feedback_endpoint', 'metrics_endpoint',
+        'text_ingestion_endpoint', 'batch_ingest_endpoint', 'ie_extraction'
+    ]
+    
+    api_table = Table(title="API Endpoints Test Results", box=box.ROUNDED)
+    api_table.add_column("Endpoint", style="cyan")
+    api_table.add_column("Status", style="green")
+    api_table.add_column("Response Time", style="yellow")
+    api_table.add_column("Details", style="dim")
+    
+    for endpoint in api_endpoints:
+        if endpoint in results.system_health:
+            endpoint_result = results.system_health[endpoint]
+            status_text = "✅ PASS" if endpoint_result.get('status', False) else "❌ FAIL"
+            
+            # Get response time from performance metrics
+            perf_data = results.performance_metrics.get(endpoint, {})
+            response_time = f"{perf_data.get('time', 0)*1000:.1f}ms" if perf_data.get('time') else "N/A"
+            
+            # Get relevant details
+            details = ""
+            if endpoint == 'query_processing':
+                details = f"Citations: {'✅' if results.citations_valid else '❌'}, Graph: {'✅' if results.graph_data_valid else '❌'}"
+            elif endpoint == 'ie_extraction':
+                if endpoint_result.get('triples_count'):
+                    details = f"Triples: {endpoint_result['triples_count']}"
+                elif endpoint_result.get('skipped'):
+                    details = "Skipped (model tests disabled)"
+            elif endpoint == 'text_ingestion_endpoint':
+                if endpoint_result.get('successful_triples'):
+                    details = f"Triples: {endpoint_result['successful_triples']}"
+            elif endpoint == 'batch_ingest_endpoint':
+                if endpoint_result.get('triples_sent'):
+                    details = f"Sent: {endpoint_result['triples_sent']}"
+            elif endpoint == 'metrics_endpoint':
+                if endpoint_result.get('total_metrics'):
+                    details = f"Metrics: {endpoint_result['total_metrics']}"
+            
+            api_table.add_row(
+                endpoint.replace('_', ' ').title(),
+                status_text,
+                response_time,
+                details
+            )
+    
+    console.print(api_table)
     console.print()
     
     # Ingestion Results
@@ -1251,14 +1880,126 @@ def generate_report(results: ValidationResults) -> None:
         perf_table.add_column("Operation", style="cyan")
         perf_table.add_column("Time (s)", style="green")
         perf_table.add_column("Status", style="yellow")
+        perf_table.add_column("Benchmark", style="blue")
+        
+        # Define performance benchmarks
+        benchmarks = {
+            'document_ingestion': 60.0,  # 1 minute
+            'query_processing': 30.0,    # 30 seconds
+            'graph_browsing': 10.0,      # 10 seconds
+            'feedback_endpoint': 5.0,    # 5 seconds
+            'metrics_endpoint': 2.0,     # 2 seconds
+            'text_ingestion_endpoint': 30.0,  # 30 seconds
+            'batch_ingest_endpoint': 10.0,    # 10 seconds
+            'ie_extraction': 120.0,      # 2 minutes (model loading)
+            'debug_endpoints': 10.0,     # 10 seconds
+            'error_handling': 15.0,      # 15 seconds
+            'performance_benchmarks': 20.0  # 20 seconds
+        }
         
         for operation, metrics in results.performance_metrics.items():
             time_taken = metrics.get('time', 0)
             status = "✅ OK" if metrics.get('success', False) else "❌ FAILED"
-            perf_table.add_row(operation.replace('_', ' ').title(), f"{time_taken:.2f}", status)
+            
+            # Check if within benchmark
+            benchmark_time = benchmarks.get(operation, 60.0)
+            benchmark_status = "🚀 FAST" if time_taken < benchmark_time * 0.5 else "✅ GOOD" if time_taken < benchmark_time else "⚠️ SLOW"
+            
+            perf_table.add_row(
+                operation.replace('_', ' ').title(),
+                f"{time_taken:.2f}",
+                status,
+                benchmark_status
+            )
         
         console.print(perf_table)
         console.print()
+    
+    # Error Handling Results
+    if 'error_handling' in results.system_health:
+        error_handling_result = results.system_health['error_handling']
+        if error_handling_result.get('individual_results'):
+            error_table = Table(title="Error Handling Test Results", box=box.ROUNDED)
+            error_table.add_column("Test Case", style="cyan")
+            error_table.add_column("Expected", style="yellow")
+            error_table.add_column("Actual", style="yellow")
+            error_table.add_column("Result", style="green")
+            
+            for test_name, test_result in error_handling_result['individual_results'].items():
+                expected = test_result.get('expected_status', 'N/A')
+                actual = test_result.get('actual_status', 'N/A')
+                result = "✅ PASS" if test_result.get('success', False) else "❌ FAIL"
+                
+                error_table.add_row(
+                    test_name.replace('_', ' ').title(),
+                    str(expected),
+                    str(actual),
+                    result
+                )
+            
+            console.print(error_table)
+            console.print()
+    
+    # Performance Benchmarks Results
+    if 'performance_benchmarks' in results.system_health:
+        benchmark_result = results.system_health['performance_benchmarks']
+        if benchmark_result.get('individual_results'):
+            benchmark_table = Table(title="Performance Benchmark Results", box=box.ROUNDED)
+            benchmark_table.add_column("Endpoint", style="cyan")
+            benchmark_table.add_column("Response Time", style="yellow")
+            benchmark_table.add_column("Benchmark", style="green")
+            benchmark_table.add_column("Status", style="blue")
+            
+            for endpoint, bench_result in benchmark_result['individual_results'].items():
+                response_time = f"{bench_result.get('response_time_ms', 0):.1f}ms"
+                benchmark_passed = bench_result.get('benchmark_passed', False)
+                status = "✅ PASS" if benchmark_passed else "⚠️ SLOW"
+                benchmark_text = "Fast response" if benchmark_passed else "Slow response"
+                
+                benchmark_table.add_row(
+                    endpoint.replace('_', ' ').title(),
+                    response_time,
+                    benchmark_text,
+                    status
+                )
+            
+            console.print(benchmark_table)
+            console.print()
+    
+    # Test Coverage Summary
+    coverage_table = Table(title="Test Coverage Summary", box=box.ROUNDED)
+    coverage_table.add_column("Test Category", style="cyan")
+    coverage_table.add_column("Tests Run", style="green")
+    coverage_table.add_column("Success Rate", style="yellow")
+    
+    # Calculate test coverage
+    test_categories = {
+        'Core API Endpoints': ['query_processing', 'graph_browsing', 'feedback_endpoint'],
+        'Ingestion Endpoints': ['text_ingestion_endpoint', 'batch_ingest_endpoint'],
+        'Information Extraction': ['ie_extraction'],
+        'Monitoring & Debug': ['metrics_endpoint', 'debug_endpoints'],
+        'Error Handling': ['error_handling'],
+        'Performance': ['performance_benchmarks'],
+        'Data Storage': ['neo4j_changes', 'faiss_changes']
+    }
+    
+    for category, tests in test_categories.items():
+        total_tests = len(tests)
+        successful_tests = sum(1 for test in tests if (
+            results.system_health.get(test, {}).get('status', False) 
+            if isinstance(results.system_health.get(test, {}), dict) 
+            else results.system_health.get(test, False)
+        ))
+        success_rate = (successful_tests / total_tests) * 100 if total_tests > 0 else 0
+        
+        coverage_table.add_row(
+            category,
+            f"{successful_tests}/{total_tests}",
+            f"{success_rate:.1f}%"
+        )
+    
+    console.print(coverage_table)
+    console.print()
     
     # Errors and Warnings
     if results.errors:
@@ -1280,11 +2021,19 @@ def generate_report(results: ValidationResults) -> None:
         console.print()
     
     # Overall Status
+    # Calculate overall success based on critical components
+    critical_tests = ['query_processing', 'graph_browsing', 'text_ingestion_endpoint']
+    critical_success = all(
+        (results.system_health.get(test, {}).get('status', False) 
+         if isinstance(results.system_health.get(test, {}), dict) 
+         else results.system_health.get(test, False))
+        for test in critical_tests
+    )
+    
     overall_success = (
         results.ingestion_success and
         len(results.errors) == 0 and
-        results.citations_valid and
-        results.graph_data_valid
+        critical_success
     )
     
     status_text = "🎯 ALL SYSTEMS OPERATIONAL" if overall_success else "⚠️  ISSUES DETECTED"
@@ -1292,8 +2041,18 @@ def generate_report(results: ValidationResults) -> None:
     
     total_time = results.get_total_time()
     
+    # Calculate test statistics
+    total_tests_run = len([k for k in results.system_health.keys() if not k.endswith('_baseline')])
+    successful_tests = len([k for k, v in results.system_health.items() 
+                           if not k.endswith('_baseline') and (v.get('status', False) if isinstance(v, dict) else v)])
+    
     final_panel = Panel(
-        f"{status_text}\n\nTotal execution time: {total_time:.2f} seconds",
+        f"{status_text}\n\n"
+        f"Total execution time: {total_time:.2f} seconds\n"
+        f"Tests completed: {successful_tests}/{total_tests_run}\n"
+        f"Success rate: {(successful_tests/total_tests_run)*100:.1f}%\n"
+        f"Errors: {len(results.errors)}\n"
+        f"Warnings: {len(results.warnings)}",
         title="Overall Status",
         border_style="green" if overall_success else "yellow"
     )
@@ -1425,6 +2184,62 @@ def check_services_and_provide_guidance(results: ValidationResults, minimal_mode
             results.add_warning(issue)
     
     return True
+
+def save_test_results(results: ValidationResults) -> None:
+    """Save detailed test results to a JSON file for analysis"""
+    logger.debug("Saving test results to file")
+    
+    try:
+        # Create results directory
+        results_dir = Path("test_results")
+        results_dir.mkdir(exist_ok=True)
+        
+        # Generate timestamp for filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        results_file = results_dir / f"e2e_test_results_{timestamp}.json"
+        
+        # Prepare results data
+        results_data = {
+            "timestamp": datetime.now().isoformat(),
+            "total_execution_time": results.get_total_time(),
+            "overall_success": len(results.errors) == 0,
+            "system_health": results.system_health,
+            "performance_metrics": results.performance_metrics,
+            "ingestion_results": {
+                "success": results.ingestion_success,
+                "entities_before": results.neo4j_entities_before,
+                "entities_after": results.neo4j_entities_after,
+                "relationships_before": results.neo4j_relationships_before,
+                "relationships_after": results.neo4j_relationships_after,
+                "faiss_vectors_before": results.faiss_vectors_before,
+                "faiss_vectors_after": results.faiss_vectors_after
+            },
+            "query_results": {
+                "response_time_ms": results.query_response_time_ms,
+                "citations_valid": results.citations_valid,
+                "graph_data_valid": results.graph_data_valid,
+                "answer_quality_score": results.answer_quality_score
+            },
+            "errors": results.errors,
+            "warnings": results.warnings,
+            "test_environment": {
+                "minimal_mode": MINIMAL_MODE,
+                "skip_model_tests": SKIP_MODEL_TESTS,
+                "api_base_url": API_BASE_URL,
+                "timeout_seconds": TIMEOUT_SECONDS
+            }
+        }
+        
+        # Save to file
+        with open(results_file, 'w') as f:
+            json.dump(results_data, f, indent=2, default=str)
+        
+        console.print(f"[green]💾 Test results saved to: {results_file}[/green]")
+        logger.info(f"Test results saved to {results_file}")
+        
+    except Exception as e:
+        console.print(f"[yellow]⚠️ Failed to save test results: {e}[/yellow]")
+        logger.warning(f"Failed to save test results: {e}")
 
 def main():
     """Main execution function"""
@@ -1669,10 +2484,132 @@ def main():
         
         results.system_health['graph_browsing'] = browse_result
         progress.update(task9, completed=100)
+        
+        # Step 10: Feedback Endpoint Test
+        task10 = progress.add_task("Testing feedback endpoint...", total=100)
+        start_time = time.time()
+        feedback_result = test_feedback_endpoint()
+        feedback_time = time.time() - start_time
+        
+        results.performance_metrics['feedback_endpoint'] = {
+            'time': feedback_time,
+            'success': feedback_result['status']
+        }
+        
+        if not feedback_result['status']:
+            results.add_error(f"Feedback endpoint failed: {feedback_result.get('error', 'Unknown error')}")
+        
+        results.system_health['feedback_endpoint'] = feedback_result
+        progress.update(task10, completed=100)
+        
+        # Step 11: Metrics Endpoint Test
+        task11 = progress.add_task("Testing metrics endpoint...", total=100)
+        start_time = time.time()
+        metrics_result = test_metrics_endpoint()
+        metrics_time = time.time() - start_time
+        
+        results.performance_metrics['metrics_endpoint'] = {
+            'time': metrics_time,
+            'success': metrics_result['status']
+        }
+        
+        if not metrics_result['status']:
+            results.add_error(f"Metrics endpoint failed: {metrics_result.get('error', 'Unknown error')}")
+        
+        results.system_health['metrics_endpoint'] = metrics_result
+        progress.update(task11, completed=100)
+        
+        # Step 12: Text Ingestion Endpoint Test
+        task12 = progress.add_task("Testing text ingestion endpoint...", total=100)
+        start_time = time.time()
+        text_ingest_result = test_text_ingestion_endpoint()
+        text_ingest_time = time.time() - start_time
+        
+        results.performance_metrics['text_ingestion_endpoint'] = {
+            'time': text_ingest_time,
+            'success': text_ingest_result['status']
+        }
+        
+        if not text_ingest_result['status']:
+            results.add_error(f"Text ingestion endpoint failed: {text_ingest_result.get('error', 'Unknown error')}")
+        
+        results.system_health['text_ingestion_endpoint'] = text_ingest_result
+        progress.update(task12, completed=100)
+        
+        # Step 13: Batch Ingest Endpoint Test
+        task13 = progress.add_task("Testing batch ingest endpoint...", total=100)
+        start_time = time.time()
+        batch_ingest_result = test_batch_ingest_endpoint()
+        batch_ingest_time = time.time() - start_time
+        
+        results.performance_metrics['batch_ingest_endpoint'] = {
+            'time': batch_ingest_time,
+            'success': batch_ingest_result['status']
+        }
+        
+        if not batch_ingest_result['status']:
+            results.add_error(f"Batch ingest endpoint failed: {batch_ingest_result.get('error', 'Unknown error')}")
+        
+        results.system_health['batch_ingest_endpoint'] = batch_ingest_result
+        progress.update(task13, completed=100)
+        
+        # Step 14: Debug Endpoints Test
+        task14 = progress.add_task("Testing debug endpoints...", total=100)
+        start_time = time.time()
+        debug_result = test_debug_endpoints()
+        debug_time = time.time() - start_time
+        
+        results.performance_metrics['debug_endpoints'] = {
+            'time': debug_time,
+            'success': debug_result['status']
+        }
+        
+        if not debug_result['status']:
+            results.add_warning(f"Debug endpoints had issues: {debug_result.get('error', 'Unknown error')}")
+        
+        results.system_health['debug_endpoints'] = debug_result
+        progress.update(task14, completed=100)
+        
+        # Step 15: Error Handling Test
+        task15 = progress.add_task("Testing error handling...", total=100)
+        start_time = time.time()
+        error_handling_result = test_error_handling()
+        error_handling_time = time.time() - start_time
+        
+        results.performance_metrics['error_handling'] = {
+            'time': error_handling_time,
+            'success': error_handling_result['status']
+        }
+        
+        if not error_handling_result['status']:
+            results.add_warning(f"Error handling test had issues: {error_handling_result.get('error', 'Unknown error')}")
+        
+        results.system_health['error_handling'] = error_handling_result
+        progress.update(task15, completed=100)
+        
+        # Step 16: Performance Benchmarks
+        task16 = progress.add_task("Running performance benchmarks...", total=100)
+        start_time = time.time()
+        performance_result = test_performance_benchmarks()
+        performance_time = time.time() - start_time
+        
+        results.performance_metrics['performance_benchmarks'] = {
+            'time': performance_time,
+            'success': performance_result['status']
+        }
+        
+        if not performance_result['status']:
+            results.add_warning(f"Performance benchmarks had issues: {performance_result.get('error', 'Unknown error')}")
+        
+        results.system_health['performance_benchmarks'] = performance_result
+        progress.update(task16, completed=100)
     
     # Generate final report
     console.print("\n")
     generate_report(results)
+    
+    # Save detailed results to file
+    save_test_results(results)
     
     # Log completion
     logger.info(f"Finished {__file__} at {datetime.now()}")

@@ -5,6 +5,7 @@ Coordinates between information extraction and database staging
 """
 
 import time
+import json
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 from dataclasses import dataclass
@@ -281,6 +282,14 @@ class IngestionService:
             head_type = get_entity_type(head)
             tail_type = get_entity_type(tail)
             
+            # Prepare metadata as JSON string
+            metadata = {
+                "head_type": head_type,
+                "tail_type": tail_type,
+                "confidence": triple.get('confidence', 1.0),
+                "extraction_method": "rebel_ie"
+            }
+            
             # Stage the triple
             sqlite_db.execute(
                 "INSERT INTO staging_triples (h_text, r_text, t_text, status, source, metadata) VALUES (?, ?, ?, 'pending', ?, ?)",
@@ -289,12 +298,7 @@ class IngestionService:
                     relation,
                     tail,
                     source,
-                    {
-                        "head_type": head_type,
-                        "tail_type": tail_type,
-                        "confidence": triple.get('confidence', 1.0),
-                        "extraction_method": "rebel_ie"
-                    }
+                    json.dumps(metadata)
                 )
             )
             return True

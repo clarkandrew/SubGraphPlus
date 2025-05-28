@@ -64,31 +64,11 @@ class ExtractionResult:
     error_message: Optional[str] = None
 
 # ----------------------------------------------------------------------
-# DEBUGGING UTILITIES
-# ----------------------------------------------------------------------
-def log_thread_and_event_loop_info(context: str):
-    """Log detailed thread and event loop information for debugging"""
-    thread_id = threading.get_ident()
-    thread_name = threading.current_thread().name
-    
-    try:
-        loop = asyncio.get_event_loop()
-        loop_running = loop.is_running()
-        loop_id = id(loop)
-    except RuntimeError:
-        loop_running = False
-        loop_id = None
-        
-    logger.info(f"🧵 THREAD DEBUG [{context}]: Thread ID={thread_id}, Name='{thread_name}', Loop Running={loop_running}, Loop ID={loop_id}")
-    console.print(f"[dim]🧵 [{context}] Thread: {thread_name} (ID: {thread_id}), Event Loop: {loop_running}[/dim]")
-
-# ----------------------------------------------------------------------
 # MODEL LOADING (Apple Silicon compatible)
 # ----------------------------------------------------------------------
 def load_models_apple_silicon_safe():
     """Load models with Apple Silicon M1/M2 compatibility fixes"""
     try:
-        log_thread_and_event_loop_info("MODEL_LOADING_START")
         logger.info("🔄 Loading models with Apple Silicon compatibility fixes...")
         console.print("[bold blue]🔄 Loading models with Apple Silicon compatibility fixes...[/bold blue]")
         
@@ -146,14 +126,12 @@ def load_models_apple_silicon_safe():
         total_time = time.time() - start_time
         logger.info(f"✅ All models loaded successfully in {total_time:.2f}s (Apple Silicon safe)")
         console.print(f"[green]✅ All models loaded successfully in {total_time:.2f}s (Apple Silicon safe)[/green]")
-        log_thread_and_event_loop_info("MODEL_LOADING_COMPLETE")
         return tokenizer, rebel_model, ner_pipe
         
     except Exception as e:
         logger.error(f"💥 Model loading failed: {e}")
         console.print_exception()
         console.print("[bold red]❌ Failed to load models – will use mock responses[/bold red]")
-        log_thread_and_event_loop_info("MODEL_LOADING_FAILED")
         return None, None, None
 
 # ----------------------------------------------------------------------
@@ -332,12 +310,10 @@ def generate_raw(sentence: str) -> str:
     import torch
     
     try:
-        log_thread_and_event_loop_info("GENERATE_RAW_START")
         logger.info(f"🔧 generate_raw() called with: '{sentence[:30]}...'")
         
         if not MODELS_LOADED:
             logger.warning("⚠️ Models not loaded in generate_raw, returning mock")
-            log_thread_and_event_loop_info("GENERATE_RAW_MOCK_RETURN")
             # Generate a more realistic mock response based on the input
             words = sentence.split()
             sentence_lower = sentence.lower()
@@ -411,15 +387,12 @@ def generate_raw(sentence: str) -> str:
             # Ultimate fallback
             return "<s><triplet> entity <subj> related to <obj> another entity</s>"
         
-        logger.info("🔧 Tokenizing input...")
-        start_tokenize = time.time()
+        # Tokenize input
         inputs = TOKENIZER(sentence,
                            max_length=MAX_LEN,
                            padding=True,
                            truncation=True,
                            return_tensors="pt")
-        tokenize_time = time.time() - start_tokenize
-        logger.info(f"🔧 Tokenization completed in {tokenize_time:.3f}s")
 
         gen_kwargs = dict(
             max_length=MAX_LEN,
@@ -430,52 +403,36 @@ def generate_raw(sentence: str) -> str:
         )
 
         logger.info("🔧 Generating with REBEL model...")
-        log_thread_and_event_loop_info("REBEL_GENERATION_START")
         
         # Memory-safe generation
         with torch.no_grad():  # Disable gradient computation
             try:
                 # Move inputs to same device as model
                 device = next(REBEL_MODEL.parameters()).device
-                logger.info(f"🔧 Model device: {device}")
                 
-                start_move = time.time()
                 input_ids = inputs["input_ids"].to(device)
                 attention_mask = inputs["attention_mask"].to(device)
-                move_time = time.time() - start_move
-                logger.info(f"🔧 Input moved to device in {move_time:.3f}s")
                 
-                start_generate = time.time()
                 generated = REBEL_MODEL.generate(
                     input_ids,
                     attention_mask=attention_mask,
                     **gen_kwargs
                 )
-                generate_time = time.time() - start_generate
-                logger.info(f"🔧 Generation completed in {generate_time:.3f}s")
                 
-                logger.info("🔧 Decoding output...")
-                start_decode = time.time()
                 decoded = TOKENIZER.batch_decode(generated, skip_special_tokens=False)
-                decode_time = time.time() - start_decode
-                logger.info(f"🔧 Decoding completed in {decode_time:.3f}s")
-                
                 result = decoded[0] if decoded else ""
                 
                 # Clean up GPU memory if available
                 if torch.cuda.is_available():
                     del input_ids, attention_mask, generated
                     torch.cuda.empty_cache()
-                    logger.info("🔧 GPU memory cleaned up")
                 
-                log_thread_and_event_loop_info("GENERATE_RAW_SUCCESS")
                 logger.info(f"🔧 generate_raw() returning: '{result[:50]}...'")
                 return result
                 
             except RuntimeError as e:
                 if "out of memory" in str(e).lower():
                     logger.warning("⚠️ GPU out of memory, falling back to CPU")
-                    log_thread_and_event_loop_info("GPU_OOM_FALLBACK_TO_CPU")
                     # Move model to CPU and retry
                     REBEL_MODEL.to('cpu')
                     input_ids = inputs["input_ids"].to('cpu')
@@ -489,15 +446,12 @@ def generate_raw(sentence: str) -> str:
                     
                     decoded = TOKENIZER.batch_decode(generated, skip_special_tokens=False)
                     result = decoded[0] if decoded else ""
-                    log_thread_and_event_loop_info("CPU_FALLBACK_SUCCESS")
                     return result
                 else:
-                    log_thread_and_event_loop_info("GENERATION_RUNTIME_ERROR")
                     raise
                     
     except Exception as e:
         logger.exception(f"💥 Generation failed: {e}")
-        log_thread_and_event_loop_info("GENERATE_RAW_EXCEPTION")
         # Return a mock response instead of crashing
         logger.warning("⚠️ Returning mock response due to generation failure")
         words = sentence.split()
@@ -511,14 +465,12 @@ def generate_raw(sentence: str) -> str:
 def extract(sentence: str, debug: bool = False) -> List[Dict[str, str]]:
     """Extract triples from text with context-aware NER typing"""
     try:
-        log_thread_and_event_loop_info("EXTRACT_FUNCTION_START")
         logger.info(f"🎯 extract() called with: '{sentence[:30]}...'")
         
         # Check if models are loaded first
         if not MODELS_LOADED:
             logger.info("⚠️ Models not loaded in extract() - returning mock result")
             console.print("[yellow]⚠️ Models not loaded - returning mock result[/yellow]")
-            log_thread_and_event_loop_info("EXTRACT_MOCK_RETURN")
             # Return a realistic mock result based on input
             sentence_lower = sentence.lower()
             words = sentence.split()
@@ -593,42 +545,28 @@ def extract(sentence: str, debug: bool = False) -> List[Dict[str, str]]:
             
             return mock_triples
         
-        logger.info("🔧 Building context NER map...")
-        start_ner = time.time()
+        # Build context NER map
         ctx_types = build_context_ner_map(sentence)
-        ner_time = time.time() - start_ner
-        logger.info(f"🔧 Context NER completed in {ner_time:.3f}s, found {len(ctx_types)} entities")
         
-        logger.info("🔧 Generating raw output...")
-        start_raw = time.time()
+        # Generate raw output
         raw = generate_raw(sentence)
-        raw_time = time.time() - start_raw
-        logger.info(f"🔧 Raw generation completed in {raw_time:.3f}s")
         
-        logger.info("🔧 Extracting triplets...")
-        start_triplets = time.time()
+        # Extract triplets
         triples = extract_triplets(raw)
-        triplets_time = time.time() - start_triplets
-        logger.info(f"🔧 Triplet extraction completed in {triplets_time:.3f}s, found {len(triples)} triples")
 
-        logger.info("🔧 Adding entity types...")
-        start_types = time.time()
+        # Add entity types
         for t in triples:
             head = t["head"]
             tail = t["tail"]
             t["head_type"] = ctx_types.get(head, get_entity_type(head))
             t["tail_type"] = ctx_types.get(tail, get_entity_type(tail))
-        types_time = time.time() - start_types
-        logger.info(f"🔧 Entity typing completed in {types_time:.3f}s")
 
         if debug:
             console.print("\n[dim]RAW OUTPUT:[/]\n", raw)
 
-        log_thread_and_event_loop_info("EXTRACT_FUNCTION_SUCCESS")
         logger.info(f"🎯 extract() returning {len(triples)} triples")
         return triples
     except Exception:
-        log_thread_and_event_loop_info("EXTRACT_FUNCTION_EXCEPTION")
         logger.exception("Full extraction failed.")
         raise
 
@@ -646,15 +584,12 @@ class InformationExtractionService:
         """Ensure models are loaded - now just checks if they were loaded during FastAPI startup"""
         global TOKENIZER, REBEL_MODEL, NER_PIPE, MODELS_LOADED
         
-        log_thread_and_event_loop_info("ENSURE_MODELS_START")
         logger.info(f"🔍 _ensure_models_loaded called - Current status: MODELS_LOADED={MODELS_LOADED}")
         
         if MODELS_LOADED:
-            log_thread_and_event_loop_info("ENSURE_MODELS_ALREADY_LOADED")
             logger.info("✅ Models already loaded during FastAPI startup")
             return True
         else:
-            log_thread_and_event_loop_info("ENSURE_MODELS_NOT_LOADED")
             logger.warning("❌ Models were not loaded during FastAPI startup - will use mock responses")
             return False
 
@@ -725,7 +660,6 @@ class InformationExtractionService:
             text = ""
         
         text_preview = text[:50] if text else "None"
-        log_thread_and_event_loop_info("SERVICE_EXTRACT_START")
         logger.info(f"🎯 extract_triples() called with text: '{text_preview}...'")
         console.print(f"[cyan]🎯 IE Service[/cyan] - Processing text: '{text[:30] if text else 'None'}...'")
         start_time = time.time()
@@ -736,13 +670,10 @@ class InformationExtractionService:
             
             # Ensure models are loaded using lazy loading
             logger.info("🔄 Checking if models need to be loaded...")
-            log_thread_and_event_loop_info("SERVICE_ENSURE_MODELS_START")
             models_ready = await self._ensure_models_loaded()
-            log_thread_and_event_loop_info("SERVICE_ENSURE_MODELS_COMPLETE")
             
             if not models_ready:
                 logger.warning("⚠️ Models could not be loaded, returning mock result")
-                log_thread_and_event_loop_info("SERVICE_MOCK_RETURN")
                 return ExtractionResult(
                     triples=[{"head": "mock", "relation": "mock", "tail": "mock", "head_type": "ENTITY", "tail_type": "ENTITY", "confidence": 1.0}],
                     raw_output="mock",
@@ -754,7 +685,6 @@ class InformationExtractionService:
             console.print(f"[cyan]🔄 Models ready:[/cyan] {MODELS_LOADED}")
             
             logger.info("🚀 About to call extract() function in executor...")
-            log_thread_and_event_loop_info("SERVICE_EXECUTOR_START")
             
             # Use the global extract function (exactly like triple.py)
             # Run in executor to prevent blocking the event loop WITH TIMEOUT
@@ -766,17 +696,13 @@ class InformationExtractionService:
                     loop.run_in_executor(None, extract, text, False),
                     timeout=GENERATION_TIMEOUT
                 )
-                log_thread_and_event_loop_info("SERVICE_EXECUTOR_SUCCESS")
                 logger.info(f"✅ extract() returned {len(triples)} triples")
                 
             except asyncio.TimeoutError:
                 logger.error(f"⏰ Extract function timed out after {GENERATION_TIMEOUT}s")
-                log_thread_and_event_loop_info("SERVICE_EXECUTOR_TIMEOUT")
                 raise TimeoutError(f"Extraction timed out after {GENERATION_TIMEOUT}s")
             
             # Convert to API format
-            logger.info("🔧 Converting to API format...")
-            start_format = time.time()
             formatted_triples = []
             for t in triples:
                 triple_with_confidence = {
@@ -788,12 +714,9 @@ class InformationExtractionService:
                     "confidence": 1.0
                 }
                 formatted_triples.append(triple_with_confidence)
-            format_time = time.time() - start_format
-            logger.info(f"🔧 API format conversion completed in {format_time:.3f}s")
 
             processing_time = time.time() - start_time
             
-            log_thread_and_event_loop_info("SERVICE_EXTRACT_SUCCESS")
             logger.info(f"🎉 Finished extraction: {len(formatted_triples)} triples in {processing_time:.2f}s")
 
             return ExtractionResult(
@@ -804,7 +727,6 @@ class InformationExtractionService:
             )
 
         except Exception as e:
-            log_thread_and_event_loop_info("SERVICE_EXTRACT_EXCEPTION")
             logger.error(f"Error in triple extraction: {e}")
             console.print_exception()
             
