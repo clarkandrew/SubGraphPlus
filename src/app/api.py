@@ -98,6 +98,16 @@ async def lifespan(app: FastAPI):
     logger.info("Initializing services...")
     ie_service = get_information_extraction_service()
     logger.info("IE service initialized")
+    
+    # Load models after FastAPI fork to avoid Apple Silicon hanging issues
+    logger.info("🚀 Loading models in FastAPI lifespan to avoid forking issues...")
+    from app.services.information_extraction import init_models_for_fastapi
+    models_loaded = init_models_for_fastapi()
+    if models_loaded:
+        logger.info("✅ Models loaded successfully in FastAPI lifespan")
+    else:
+        logger.warning("⚠️ Models failed to load in FastAPI lifespan - will use mock responses")
+    
     # Temporarily comment out ingestion service to debug hang
     # ingestion_service = get_ingestion_service()
     logger.info("Services initialized")
@@ -139,9 +149,13 @@ async def get_api_key(request: Request, api_key: str = Depends(api_key_header)) 
     """Validate API key"""
     # Skip authentication for health check endpoints
     if request.url.path in ["/healthz", "/readyz", "/metrics", "/ie/health", "/ie/info"]:
+        logger.info(f"🔐 AUTH SKIP - Health check endpoint: {request.url.path}")
         return ""
     
+    logger.info(f"🔐 AUTH CHECK - Validating API key...")
+    
     if not api_key:
+        logger.warning(f"🔐 AUTH FAIL - Missing API key")
         raise HTTPException(
             status_code=HTTP_401_UNAUTHORIZED,
             detail="Missing API key",
@@ -151,30 +165,29 @@ async def get_api_key(request: Request, api_key: str = Depends(api_key_header)) 
     # In a production system, we would check the key against a database
     # For this MVP, we use a simple comparison with environment variable
     if api_key != API_KEY_SECRET:
+        logger.warning(f"🔐 AUTH FAIL - Invalid API key provided")
+        
         # Log failed attempt in SQLite (skip during testing)
         if not TESTING and sqlite_db is not None:
-            client_ip = request.client.host if request.client else "unknown"
-            ip_hash = hashlib.sha256(client_ip.encode()).hexdigest()
-            sqlite_db.execute(
-                "INSERT INTO failed_auth_attempts (ip_address) VALUES (?)",
-                (ip_hash,)
-            )
+            # ASYNC SAFETY: Skip SQLite operations in async context to prevent blocking
+            # This prevents the event loop from freezing on database calls
+            logger.warning(f"🔐 AUTH DB - Skipping SQLite operations to prevent async blocking")
             
-            # Check for brute force attempts
-            recent_attempts = sqlite_db.fetchall(
-                "SELECT COUNT(*) as count FROM failed_auth_attempts WHERE ip_address = ? AND timestamp > datetime('now', '-10 minutes')",
-                (ip_hash,)
-            )
-            if recent_attempts and recent_attempts[0]["count"] > 5:
-                logger.warning(f"Possible brute force attack from {ip_hash}")
-                # In production, we might implement a temporary IP ban
+            # TODO: Implement proper async database operations using asyncio
+            # For now, we'll just log the failed attempt without storing it
+            client_ip = request.client.host if request.client else "unknown"
+            logger.warning(f"🔐 AUTH FAIL - Failed auth attempt from IP: {client_ip} (not stored)")
+        else:
+            logger.info(f"🔐 AUTH DB - SQLite operations skipped (TESTING={TESTING}, sqlite_db={sqlite_db is not None})")
         
+        logger.warning(f"🔐 AUTH FAIL - Raising HTTPException for invalid key")
         raise HTTPException(
             status_code=HTTP_401_UNAUTHORIZED,
             detail="Invalid API key",
             headers={"WWW-Authenticate": "APIKey"},
         )
     
+    logger.info(f"🔐 AUTH SUCCESS - Valid API key provided")
     return api_key
 
 # Health check endpoint
@@ -264,33 +277,22 @@ async def extract_triples(
     Returns:
         ExtractResponse with extracted triples and metadata
     """
-    import sys
-    CONSOLEx.print(f"\n{'='*60}", flush=True)
-    CONSOLEx.print(f"🎯 IE EXTRACTION REQUEST RECEIVED", flush=True)
-    CONSOLEx.print(f"📝 Text: '{request.text[:50]}...'", flush=True)
-    CONSOLEx.print(f"📏 Length: {len(request.text)} characters", flush=True)
-    CONSOLEx.print(f"{'='*60}\n", flush=True)
-    sys.stdout.flush()
-    
     logger.info(f"🎯 Starting IE extraction for text: '{request.text[:50]}...' (length: {len(request.text)})")
     CONSOLEx.print(f"[bold green]🎯 IE Extraction Request[/bold green] - Text length: {len(request.text)} chars")
     
     try:
         # Delegate to information extraction service
         ie_service = get_information_extraction_service()
-        print("📞 Getting IE service instance...", flush=True)
-        logger.info("📞 Calling IE service extract_triples...")
-        CONSOLEx.print("[yellow]📞 Calling IE service...[/yellow]")
         
-        print("🚀 Calling extract_triples method...", flush=True)
-        result = ie_service.extract_triples(
+        start_service_call = time.time()
+        result = await ie_service.extract_triples(
             text=request.text,
             max_length=request.max_length,
             num_beams=request.num_beams
         )
+        service_call_time = time.time() - start_service_call
         
-        print(f"✅ Extraction completed!", flush=True)
-        logger.info(f"✅ IE extraction completed: {len(result.triples) if result.success else 0} triples")
+        logger.info(f"✅ IE extraction completed: {len(result.triples) if result.success else 0} triples in {service_call_time:.2f}s")
         CONSOLEx.print(f"[bold green]✅ Extraction completed[/bold green] - Found {len(result.triples) if result.success else 0} triples")
         
         if not result.success:
@@ -317,11 +319,6 @@ async def extract_triples(
             raw_output=result.raw_output,
             processing_time=result.processing_time
         )
-        
-        # Log the response for debugging
-        print(f"\n📤 Sending response with {len(triples)} triples", flush=True)
-        print(f"⏱️  Processing time: {result.processing_time:.2f}s", flush=True)
-        print(f"{'='*60}\n", flush=True)
         
         return response
 
@@ -379,6 +376,37 @@ async def ie_model_info():
             "service": "SubgraphRAG+ Unified API - IE Module"
         }
     except Exception as e:
+        logger.exception("Failed to get IE model info")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/debug/load-test")
+async def debug_load_test():
+    """Debug endpoint to test model loading in isolation"""
+    try:
+        import time
+        from transformers import AutoTokenizer
+        
+        start_time = time.time()
+        logger.info("🔍 Debug: Starting tokenizer load test...")
+        
+        # Try to load just the tokenizer first
+        tokenizer = AutoTokenizer.from_pretrained("Babelscape/rebel-large")
+        tokenizer_time = time.time() - start_time
+        
+        logger.info(f"🔍 Debug: Tokenizer loaded in {tokenizer_time:.2f}s")
+        
+        return {
+            "status": "success",
+            "tokenizer_load_time": tokenizer_time,
+            "tokenizer_vocab_size": tokenizer.vocab_size if hasattr(tokenizer, 'vocab_size') else "unknown"
+        }
+    except Exception as e:
+        logger.exception("Debug load test failed")
+        return {
+            "status": "failed",
+            "error": str(e),
+            "error_type": type(e).__name__
+        }
         # RULE:rich-error-handling-required
         logger.error(f"Error getting IE model info: {e}")
         raise HTTPException(500, f"Failed to get model info: {e}")
@@ -403,7 +431,7 @@ async def ingest_text(
     try:
         # Delegate to ingestion service
         ingestion_service = get_ingestion_service()
-        result = ingestion_service.process_text_content(
+        result = await ingestion_service.process_text_content(
             text=request.text,
             source=request.source
         )

@@ -1,5 +1,28 @@
-# ... existing services ...
-# Note: IE service functionality is now integrated into the main API
+version: '3.8'
+
+services:
+  neo4j:
+    image: neo4j:4.4
+    container_name: subgraphrag_neo4j
+    environment:
+      - NEO4J_AUTH=neo4j/password
+      - NEO4J_dbms_security_procedures_unrestricted=apoc.*
+      - NEO4J_PLUGINS=["apoc"]
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+    healthcheck:
+      test: ["CMD", "wget", "http://localhost:7474", "-O", "/dev/null", "-q"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - rag
+    restart: unless-stopped
 
   ner:
     build:
@@ -19,4 +42,10 @@
       - neo4j
     restart: unless-stopped
 
-# ... existing services ... 
+networks:
+  rag:
+    driver: bridge
+
+volumes:
+  neo4j_data:
+  neo4j_logs: 

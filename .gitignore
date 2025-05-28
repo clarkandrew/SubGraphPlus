@@ -115,6 +115,15 @@ temp/
 .gitcopy
 x.sh
 
+# Temporary test files (debugging)
+test_*.py
+debug_*.py
+temp_*.py
+*_temp.py
+*_debug.py
+server*.log
+output*.log
+
 # Backup files
 backups/
 *.bak
@@ -188,3 +197,4 @@ tests/ORGANIZATION_SUMMARY.md
 ALIGNMENT_REPORT.md
 TEST_STATUS_REPORT.md
 models/rebel
+

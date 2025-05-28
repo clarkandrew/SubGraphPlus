@@ -218,7 +218,7 @@ def normalize_relation(relation: str) -> str:
     
     return relation_mappings.get(normalized, normalized)
 
-def batch_process_texts(texts: List[str], api_url: str = "http://localhost:8000", max_length: int = 256, api_key: str = None) -> List[Triple]:
+async def batch_process_texts(texts: List[str], api_url: str = "http://localhost:8000", max_length: int = 256, api_key: str = None) -> List[Triple]:
     """
     Process multiple texts using the services architecture
     
@@ -245,7 +245,7 @@ def batch_process_texts(texts: List[str], api_url: str = "http://localhost:8000"
             logger.debug(f"Processing text {i+1}/{len(texts)}")
             
             # Use IE service directly
-            result = ie_service.extract_triples(text, max_length)
+            result = await ie_service.extract_triples(text, max_length)
             
             if result.success:
                 # Convert to our Triple format

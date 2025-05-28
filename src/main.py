@@ -26,6 +26,9 @@ logger = logging.getLogger(__name__)
 
 def setup_environment():
     """Set up required directories and environment"""
+    # Disable model loading at import time to prevent segfaults
+    os.environ['SUBGRAPHRAG_DISABLE_MODEL_LOADING'] = 'true'
+    
     # Ensure required directories exist
     for directory in ['data', 'logs', 'cache', 'models']:
         os.makedirs(directory, exist_ok=True)

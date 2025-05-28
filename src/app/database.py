@@ -45,6 +45,7 @@ class Neo4jDatabase:
             return
             
         try:
+            # For neo4j+s:// URIs, encryption is already specified in the URI scheme
             self._driver = GraphDatabase.driver(
                 NEO4J_URI,
                 auth=(NEO4J_USER, NEO4J_PASSWORD)
@@ -262,8 +263,8 @@ def get_sqlite_db():
 
 # Initialize databases immediately for now (can be made lazy later)
 if not TESTING:
-    # Temporarily disable Neo4j to debug hang
-    # neo4j_db = Neo4jDatabase()
+    # Initialize Neo4j database
+    neo4j_db = Neo4jDatabase()
     sqlite_db = SQLiteDatabase()
 
 

@@ -200,6 +200,26 @@ test: ## Testing - Run test suite
 	@echo "🧪 Running tests..."
 	@TESTING=1 DISABLE_MODELS=1 LOG_LEVEL=DEBUG $(VENV_PYTHON) -m pytest $(TESTS_DIR)/ -v -s --tb=short
 
+.PHONY: test-e2e
+test-e2e: ## Testing - Run end-to-end integration test
+	@echo "🧪 Running end-to-end integration test..."
+	@$(VENV_PYTHON) scripts/end_to_end_test.py
+
+.PHONY: test-e2e-minimal
+test-e2e-minimal: ## Testing - Run minimal end-to-end test (requires only API server)
+	@echo "🧪 Running minimal end-to-end test..."
+	@$(VENV_PYTHON) scripts/end_to_end_test.py --minimal --skip-models
+
+.PHONY: test-simple
+test-simple: ## Testing - Run simple end-to-end test (fast, basic functionality)
+	@echo "🧪 Running simple end-to-end test..."
+	@$(VENV_PYTHON) scripts/end_to_end_test_simple.py --minimal
+
+.PHONY: test-rebel-fix
+test-rebel-fix: ## Testing - Test REBEL model loading fix (verifies no segmentation faults)
+	@echo "🧪 Testing REBEL model loading fix..."
+	@$(VENV_PYTHON) test_rebel_fix.py
+
 .PHONY: test-fast
 test-fast: ## Testing - Run fast tests only
 	@echo "🧪 Running fast tests..."
@@ -270,7 +290,17 @@ clean: ## Utility - Clean temporary files
 	@echo "✅ Clean complete!"
 
 .PHONY: reset
-reset: ## Utility - Reset all data (⚠️ DESTRUCTIVE)
+reset: ## Utility - Reset all data using comprehensive reset script (⚠️ DESTRUCTIVE)
+	@echo "🔄 Running comprehensive database reset..."
+	@$(VENV_PYTHON) scripts/reset_dbs.py
+
+.PHONY: reset-confirm
+reset-confirm: ## Utility - Reset all data without confirmation (⚠️ DESTRUCTIVE)
+	@echo "🔄 Running comprehensive database reset (no confirmation)..."
+	@$(VENV_PYTHON) scripts/reset_dbs.py --confirm
+
+.PHONY: reset-legacy
+reset-legacy: ## Utility - Legacy reset method (⚠️ DESTRUCTIVE)
 	@echo "⚠️  WARNING: This will delete all data!"
 	@echo "Press Enter to continue or Ctrl+C to cancel..."
 	@read dummy

@@ -54,7 +54,7 @@ class IngestionService:
         
         logger.debug("Finished IngestionService initialization")
     
-    def process_text_file(self, file_path: str, chunk_size: int = DEFAULT_CHUNK_SIZE) -> IngestionResult:
+    async def process_text_file(self, file_path: str, chunk_size: int = 2000) -> IngestionResult:
         """
         Process a text file by extracting triples from chunks
         
@@ -97,7 +97,7 @@ class IngestionService:
             for i, chunk in enumerate(chunks):
                 logger.info(f"Processing chunk {i+1}/{len(chunks)}")
                 
-                chunk_result = self._process_text_chunk(
+                chunk_result = await self._process_text_chunk(
                     chunk, 
                     chunk_index=i,
                     source=f"file:{Path(file_path).name}"
@@ -137,7 +137,7 @@ class IngestionService:
                 warnings=warnings
             )
     
-    def process_text_content(self, text: str, source: str = "direct_input") -> IngestionResult:
+    async def process_text_content(self, text: str, source: str = "direct_input") -> IngestionResult:
         """
         Process raw text content directly
         
@@ -152,7 +152,7 @@ class IngestionService:
         
         start_time = time.time()
         
-        chunk_result = self._process_text_chunk(text, chunk_index=0, source=source)
+        chunk_result = await self._process_text_chunk(text, chunk_index=0, source=source)
         
         return IngestionResult(
             total_triples=chunk_result.triples_extracted,
@@ -201,7 +201,7 @@ class IngestionService:
             warnings=[]
         )
     
-    def _process_text_chunk(self, text: str, chunk_index: int, source: str) -> ChunkProcessingResult:
+    async def _process_text_chunk(self, text: str, chunk_index: int, source: str) -> ChunkProcessingResult:
         """
         Process a single text chunk through the full pipeline
         
@@ -219,7 +219,7 @@ class IngestionService:
         errors = []
         
         # Extract triples using IE service
-        extraction_result = self.ie_service.extract_triples(text)
+        extraction_result = await self.ie_service.extract_triples(text)
         
         if not extraction_result.success:
             errors.append(f"IE extraction failed: {extraction_result.error_message}")
